@@ -386,7 +386,7 @@ function App() {
         const tracks = await SpotifyApi.getPlaylistTracks(playlist.id);
         const playlistSize = tracks.length;
 
-        // Sample 15 tracks from beginning, middle, and end sections
+        // Sample tracks from different sections
         const sampleSize = Math.min(15, playlistSize);
         const sampledTracks = [];
         const sections = 3;
@@ -404,20 +404,62 @@ function App() {
           }
         }
 
-        // Make multiple API calls with different seed combinations
+        // 1. Extract Genres (Crucial for Vibe Match)
+        const genreMap = {};
+        // Batch fetch artists for first 10 sampled tracks to minimalize API calls
+        const artistIds = [...new Set(sampledTracks.slice(0, 10).map(t => t.artists[0]?.id).filter(Boolean))];
+
+        // Fetch artist details one by one (or batch if possible, but standard endpoint is single)
+        // We'll limit to checking first 5 unique artists to save time
+        for (const artistId of artistIds.slice(0, 5)) {
+          try {
+            const artist = await SpotifyApi.getArtist(artistId);
+            if (artist.genres) {
+              artist.genres.forEach(g => genreMap[g] = (genreMap[g] || 0) + 1);
+            }
+          } catch (e) { /* silent fail */ }
+        }
+
+        const topGenres = Object.entries(genreMap)
+          .sort((a, b) => b[1] - a[1]) // Sort by frequency
+          .slice(0, 3)                 // Take top 3
+          .map(([g]) => g);
+
+        // 2. Extract Audio Features (Energy, Tempo, etc.)
+        let targetFeatures = {};
+        try {
+          const featureTrackIds = sampledTracks.slice(0, 5).map(t => t.id); // Analyze first 5
+          const features = await SpotifyApi.getAudioFeatures(featureTrackIds);
+
+          if (features && features.length > 0) {
+            const valid = features.filter(Boolean);
+            if (valid.length > 0) {
+              const avg = (key) => valid.reduce((sum, f) => sum + (f[key] || 0), 0) / valid.length;
+              targetFeatures = {
+                target_energy: avg('energy'),
+                target_danceability: avg('danceability'),
+                target_valence: avg('valence')
+              };
+            }
+          }
+        } catch (e) { console.warn("Feature extraction failed", e); }
+
+        // 3. Smart Fetch
+        // Use multiple seed combinations for diversity
         const seedGroups = [];
         for (let i = 0; i < sampledTracks.length; i += 5) {
           seedGroups.push(sampledTracks.slice(i, i + 5).map(t => t.id));
         }
 
+        // Call our new Smart Recommendation engine
         const recPromises = seedGroups.map(seeds =>
-          SpotifyApi.getRecommendations(seeds, [], [], 'discovery')
+          SpotifyApi.getRecommendationsWithFeatures(seeds, topGenres, targetFeatures)
         );
 
         const recResults = await Promise.all(recPromises);
         allRecs = recResults.flat();
 
-        // Remove duplicates and shuffle
+        // Deduplicate
         const uniqueRecs = Array.from(new Map(allRecs.map(s => [s.id, s])).values());
         allRecs = uniqueRecs.sort(() => 0.5 - Math.random());
 

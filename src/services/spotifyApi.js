@@ -170,10 +170,66 @@ export async function getUserPlaylists() {
     return res.items;
 }
 
-export async function getArtistDetails(artistId) {
+
+export async function getArtist(artistId) {
     return await spotify.getArtist(artistId);
 }
 
-export async function getAudioFeatures(trackId) {
-    return await spotify.getAudioFeaturesForTrack(trackId);
+export async function getAudioFeatures(trackIds) {
+    const res = await spotify.getAudioFeaturesForTracks(trackIds);
+    return res.audio_features;
+}
+
+// Smart Recommendation Engine: Tries real API -> Falls back to strict Genre Search
+export async function getRecommendationsWithFeatures(seedTracks, seedGenres, targetFeatures) {
+    const token = spotify.getAccessToken();
+
+    // 1. Try Real Recommendations API (Best Quality)
+    try {
+        const res = await spotify.getRecommendations({
+            seed_tracks: seedTracks.slice(0, 3),
+            seed_genres: seedGenres.slice(0, 2),
+            limit: 20,
+            ...targetFeatures
+        });
+
+        if (res.tracks && res.tracks.length > 0) {
+            return res.tracks.filter(t => t.preview_url); // Prefer tracks with previews
+        }
+    } catch (e) {
+        // Fallback if API is restricted/quota exceeded
+        console.warn("Standard Recs API failed, switching to Search Strategy...");
+    }
+
+    // 2. Search Strategy (Strict)
+    // ONLY search for the explicit genres from the playlist, no random "discovery" genres
+    const fetchPromises = [];
+
+    // Search for the specific genres from the playlist
+    if (seedGenres.length > 0) {
+        seedGenres.forEach(genre => {
+            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 0, token)); // Strict match
+            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 50, token)); // Diversity
+            // Try combined genre + year for freshness
+            fetchPromises.push(searchForTracks(`genre:"${genre}" year:2023-2025`, 0, token));
+        });
+    } else {
+        // Absolute fallback if no genres found
+        fetchPromises.push(searchForTracks(`year:2024`, 0, token));
+    }
+
+    const resultsBatches = await Promise.all(fetchPromises);
+    let allTracks = resultsBatches.flat();
+
+    // 3. Deduplicate
+    const unique = [];
+    const seenIds = new Set();
+    for (const t of allTracks) {
+        if (!seenIds.has(t.id)) {
+            seenIds.add(t.id);
+            unique.push(t);
+        }
+    }
+
+    return unique.sort(() => 0.5 - Math.random());
 }
