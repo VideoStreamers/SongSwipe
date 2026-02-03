@@ -159,9 +159,8 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
                 <img src={song.album.images[0]?.url} alt={song.name} className="song-image" crossOrigin="anonymous" />
                 <div className="gradient-overlay" />
 
-                {/* Visual Play Overlay */}
                 <div className={`play-overlay ${isPaused || isPlaying ? 'show' : 'hide'}`}>
-                    {isPaused ? <Zap size={32} fill="#FFD700" /> : (isPlaying ? <Pause fill="white" size={32} /> : <Play fill="white" size={32} style={{ marginLeft: 4 }} />)}
+                    {isPaused ? <Play fill="white" size={32} style={{ marginLeft: 4 }} /> : (isPlaying ? <Pause fill="white" size={32} /> : <Play fill="white" size={32} style={{ marginLeft: 4 }} />)}
                 </div>
             </div>
 
@@ -195,6 +194,15 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
                     loop
                     onError={handleAudioError}
                     crossOrigin="anonymous"
+                />
+            )}
+
+            {/* Preload next 2 songs for instant playback */}
+            {!isActive && index <= 2 && song.preview_url && (
+                <audio
+                    preload="auto"
+                    src={song.preview_url}
+                    style={{ display: 'none' }}
                 />
             )}
         </motion.div>

@@ -337,6 +337,39 @@
   touch-action: manipulation;
 }
 
+.control-btn.nope {
+  background: rgba(255, 82, 82, 0.08);
+  border-color: rgba(255, 82, 82, 0.2);
+}
+
+.control-btn.nope:hover {
+  background: rgba(255, 82, 82, 0.15);
+  border-color: rgba(255, 82, 82, 0.4);
+  box-shadow: 0 0 20px rgba(255, 82, 82, 0.2);
+}
+
+.control-btn.super {
+  background: rgba(255, 193, 7, 0.08);
+  border-color: rgba(255, 193, 7, 0.2);
+}
+
+.control-btn.super:hover {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.4);
+  box-shadow: 0 0 20px rgba(255, 193, 7, 0.2);
+}
+
+.control-btn.like {
+  background: rgba(29, 185, 84, 0.08);
+  border-color: rgba(29, 185, 84, 0.2);
+}
+
+.control-btn.like:hover {
+  background: rgba(29, 185, 84, 0.15);
+  border-color: rgba(29, 185, 84, 0.4);
+  box-shadow: 0 0 20px rgba(29, 185, 84, 0.2);
+}
+
 .deck-header {
   text-align: center;
   margin-bottom: 32px;

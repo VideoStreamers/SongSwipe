@@ -197,3 +197,21 @@
     letter-spacing: 2px;
     color: var(--text-primary);
 }
+
+@media (max-width: 768px) {
+
+    .sidebar-tab,
+    .curation-tab {
+        width: 64px !important;
+        height: 64px !important;
+        border-radius: 20px;
+        left: 15px;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .sidebar-tab:active,
+    .curation-tab:active {
+        transform: translateY(-50%) scale(0.9);
+    }
+}
