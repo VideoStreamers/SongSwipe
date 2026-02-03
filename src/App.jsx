@@ -176,8 +176,9 @@ function App() {
   const [activeArtistData, setActiveArtistData] = useState(null);
   const [pulseData, setPulseData] = useState({ active: false, color: null });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isLibraryOpen, setIsLibraryOpen] = useState(true);
-  const [isCurationOpen, setIsCurationOpen] = useState(true);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isCurationOpen, setIsCurationOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const volumeNotchRef = useRef(0);
 
   const triggerPulse = (direction) => {
@@ -361,6 +362,12 @@ function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--accent', 'var(--mood-discovery)');
+
+    // Detect mobile on mount
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const handlePlaylistSelect = async (playlist) => {
@@ -420,106 +427,128 @@ function App() {
         <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 30, stiffness: 100, mass: 0.5 }} />
         <AnimatedBackground />
 
-        <section className="snap-section hero-snap">
-          <PerspectiveCard className="demo-window">
-            <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ repeat: Infinity, duration: 5 }}><Music size={80} color="var(--accent)" /></motion.div>
-            <h1 className="main-title">SongSwipe</h1>
-            <p className="login-subtitle">The most tactile music discovery engine on the planet.</p>
-            <button className="login-btn" onClick={redirectToAuthCodeFlow} style={{ padding: '30px 80px', fontSize: '2rem' }}>ENTER THE FLOW</button>
-            <div className="scroll-indicator">Explore Innovation <ChevronDown size={24} style={{ display: 'block', margin: '10px auto' }} /></div>
-            <div className="credits-footer" style={{ position: 'absolute', bottom: -120, left: 0, width: '100%', textAlign: 'center' }}>
-              Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
-              <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
+        {/* MOBILE LANDING PAGE */}
+        {isMobile && (
+          <section className="snap-section hero-snap">
+            <div className="mobile-landing">
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ repeat: Infinity, duration: 3 }}
+              >
+                <Music size={60} color="var(--accent)" />
+              </motion.div>
+              <h1 className="mobile-title">SongSwipe</h1>
+              <p className="mobile-subtitle">Tactile music discovery</p>
+              <button className="login-btn mobile-login" onClick={redirectToAuthCodeFlow}>ENTER</button>
             </div>
-          </PerspectiveCard>
-        </section>
+          </section>
+        )}
 
-        <section className="snap-section feature-snap">
-          <h2 className="vibe-text" style={{ top: '15%' }}>DYNAMICS.</h2>
-          <div className="vibe-card-grid">
-            <PerspectiveCard className="gimmick-card">
-              <Zap size={64} color="var(--accent)" />
-              <h3>TACTILE PHYSICS</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Icons you can touch and toss.</p>
-              <PhysicsBox />
-            </PerspectiveCard>
-            <PerspectiveCard className="gimmick-card">
-              <Star size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
-              <h3>CHROMATIC FLOW</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Extracting the soul of every pixel.</p>
-              <ColorMixer />
-            </PerspectiveCard>
-            <PerspectiveCard className="gimmick-card">
-              <Sparkles size={64} color="var(--mood-chill)" style={{ color: 'var(--mood-chill)' }} />
-              <h3>ULTRA FLUID</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 12, marginBottom: 20 }}>Physics-based UI for music lovers.</p>
-              <GravityTiles />
-            </PerspectiveCard>
-          </div>
-        </section>
+        {/* DESKTOP LANDING PAGE */}
+        {!isMobile && (
+          <>
+            <section className="snap-section hero-snap">
+              <PerspectiveCard className="demo-window">
+                <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ repeat: Infinity, duration: 5 }}><Music size={80} color="var(--accent)" /></motion.div>
+                <h1 className="main-title">SongSwipe</h1>
+                <p className="login-subtitle">The most tactile music discovery engine on the planet.</p>
+                <button className="login-btn" onClick={redirectToAuthCodeFlow} style={{ padding: '30px 80px', fontSize: '2rem' }}>ENTER THE FLOW</button>
+                <div className="scroll-indicator">Explore Innovation <ChevronDown size={24} style={{ display: 'block', margin: '10px auto' }} /></div>
+                <div className="credits-footer" style={{ position: 'absolute', bottom: -120, left: 0, width: '100%', textAlign: 'center' }}>
+                  Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
+                  <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
+                </div>
+              </PerspectiveCard>
+            </section>
 
-        <section className="snap-section feature-snap" style={{ background: 'rgba(0,0,0,0.2)' }}>
-          <h2 className="vibe-text" style={{ top: '15%', opacity: 0.1 }}>SENSORY.</h2>
-          <div className="vibe-card-grid">
-            <PerspectiveCard className="gimmick-card">
-              <Music size={64} color="var(--accent)" />
-              <h3>SONIC SCANNER</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Real-time playback visualization.</p>
-              <FrequencyScanner />
-            </PerspectiveCard>
-            <PerspectiveCard className="gimmick-card">
-              <Globe size={64} color="var(--accent)" />
-              <h3>GLOBAL SYNC</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Synchronized with the world's library.</p>
-              <div style={{ position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <VibePulse />
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}>
-                  <Globe size={80} style={{ opacity: 0.2 }} />
-                </motion.div>
+            <section className="snap-section feature-snap">
+              <h2 className="vibe-text" style={{ top: '15%' }}>DYNAMICS.</h2>
+              <div className="vibe-card-grid">
+                <PerspectiveCard className="gimmick-card">
+                  <Zap size={64} color="var(--accent)" />
+                  <h3>TACTILE PHYSICS</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Icons you can touch and toss.</p>
+                  <PhysicsBox />
+                </PerspectiveCard>
+                <PerspectiveCard className="gimmick-card">
+                  <Star size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
+                  <h3>CHROMATIC FLOW</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Extracting the soul of every pixel.</p>
+                  <ColorMixer />
+                </PerspectiveCard>
+                <PerspectiveCard className="gimmick-card">
+                  <Sparkles size={64} color="var(--mood-chill)" style={{ color: 'var(--mood-chill)' }} />
+                  <h3>ULTRA FLUID</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 12, marginBottom: 20 }}>Physics-based UI for music lovers.</p>
+                  <GravityTiles />
+                </PerspectiveCard>
               </div>
-            </PerspectiveCard>
-            <PerspectiveCard className="gimmick-card">
-              <Cpu size={64} color="var(--mood-hype)" />
-              <h3>NEURAL MATCH</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>AI-driven discovery engine.</p>
-              <div style={{ padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '15px' }}>
-                {[1, 2, 3].map(i => (
-                  <motion.div
-                    key={i}
-                    initial={{ width: '0%' }}
-                    animate={{ width: ['20%', '100%', '20%'] }}
-                    transition={{ repeat: Infinity, duration: 4, delay: i * 0.5 }}
-                    style={{ height: '6px', background: 'var(--accent)', borderRadius: '3px', marginBottom: '10px', opacity: 0.3 }}
-                  />
-                ))}
-              </div>
-            </PerspectiveCard>
-          </div>
-        </section>
+            </section>
 
-        <section className="snap-section hero-snap" style={{ background: 'var(--bg-primary)' }}>
-          <h2 className="vibe-text" style={{ bottom: '20%', opacity: 0.05 }}>INTELLIGENCE.</h2>
-          <div className="vibe-card-grid">
-            <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
-              <Globe size={64} color="var(--accent)" />
-              <h3>GLOBAL DISCOVERY</h3>
-              <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Hook into the world's largest music library with high-performance recommendation logic.</p>
-              <motion.div style={{ marginTop: 20, height: '4px', background: 'var(--accent)', width: '0%' }} animate={{ width: '100%' }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }} />
-            </PerspectiveCard>
-            <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
-              <Cpu size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
-              <h3>MOOD-BASED AI</h3>
-              <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Our Hype/Chill filters actively analyze temporal data for biological matching.</p>
-              <div style={{ marginTop: 20, display: 'flex', gap: 5, alignItems: 'flex-end', height: 40, justifyContent: 'center' }}>
-                {[1, 2, 3, 4, 5].map(i => <motion.div key={i} animate={{ height: [10, 30, 10] }} transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }} style={{ width: 6, background: 'var(--accent)', borderRadius: 3 }} />)}
+            <section className="snap-section feature-snap" style={{ background: 'rgba(0,0,0,0.2)' }}>
+              <h2 className="vibe-text" style={{ top: '15%', opacity: 0.1 }}>SENSORY.</h2>
+              <div className="vibe-card-grid">
+                <PerspectiveCard className="gimmick-card">
+                  <Music size={64} color="var(--accent)" />
+                  <h3>SONIC SCANNER</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Real-time playback visualization.</p>
+                  <FrequencyScanner />
+                </PerspectiveCard>
+                <PerspectiveCard className="gimmick-card">
+                  <Globe size={64} color="var(--accent)" />
+                  <h3>GLOBAL SYNC</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Synchronized with the world's library.</p>
+                  <div style={{ position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <VibePulse />
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}>
+                      <Globe size={80} style={{ opacity: 0.2 }} />
+                    </motion.div>
+                  </div>
+                </PerspectiveCard>
+                <PerspectiveCard className="gimmick-card">
+                  <Cpu size={64} color="var(--mood-hype)" />
+                  <h3>NEURAL MATCH</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>AI-driven discovery engine.</p>
+                  <div style={{ padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '15px' }}>
+                    {[1, 2, 3].map(i => (
+                      <motion.div
+                        key={i}
+                        initial={{ width: '0%' }}
+                        animate={{ width: ['20%', '100%', '20%'] }}
+                        transition={{ repeat: Infinity, duration: 4, delay: i * 0.5 }}
+                        style={{ height: '6px', background: 'var(--accent)', borderRadius: '3px', marginBottom: '10px', opacity: 0.3 }}
+                      />
+                    ))}
+                  </div>
+                </PerspectiveCard>
               </div>
-            </PerspectiveCard>
-          </div>
-          <div className="credits-footer" style={{ position: 'absolute', bottom: 40, width: '100%', textAlign: 'center' }}>
-            Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
-            <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
-          </div>
-        </section>
+            </section>
+
+            <section className="snap-section hero-snap" style={{ background: 'var(--bg-primary)' }}>
+              <h2 className="vibe-text" style={{ bottom: '20%', opacity: 0.05 }}>INTELLIGENCE.</h2>
+              <div className="vibe-card-grid">
+                <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
+                  <Globe size={64} color="var(--accent)" />
+                  <h3>GLOBAL DISCOVERY</h3>
+                  <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Hook into the world's largest music library with high-performance recommendation logic.</p>
+                  <motion.div style={{ marginTop: 20, height: '4px', background: 'var(--accent)', width: '0%' }} animate={{ width: '100%' }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }} />
+                </PerspectiveCard>
+                <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
+                  <Cpu size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
+                  <h3>MOOD-BASED AI</h3>
+                  <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Our Hype/Chill filters actively analyze temporal data for biological matching.</p>
+                  <div style={{ marginTop: 20, display: 'flex', gap: 5, alignItems: 'flex-end', height: 40, justifyContent: 'center' }}>
+                    {[1, 2, 3, 4, 5].map(i => <motion.div key={i} animate={{ height: [10, 30, 10] }} transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }} style={{ width: 6, background: 'var(--accent)', borderRadius: 3 }} />)}
+                  </div>
+                </PerspectiveCard>
+              </div>
+              <div className="credits-footer" style={{ position: 'absolute', bottom: 40, width: '100%', textAlign: 'center' }}>
+                Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
+                <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     );
   }
