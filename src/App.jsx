@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, User, X, Heart, Star, Music, Plus, RotateCcw, Zap, ChevronDown, Sparkles, Globe, Cpu, Volume2, VolumeX } from 'lucide-react';
 import SongCard from './components/SongCard';
 import PlaylistSidebar from './components/PlaylistSidebar';
+import CurationSidebar from './components/CurationSidebar';
 import SettingsModal from './components/SettingsModal';
-import AddToPlaylistModal from './components/AddToPlaylistModal';
 import AnimatedBackground from './components/AnimatedBackground';
 import MusicParticles from './components/MusicParticles';
 import './components/AnimatedBackground.css';
@@ -72,6 +72,68 @@ const PerspectiveCard = ({ children, className, style, onClick }) => {
   );
 };
 
+const FrequencyScanner = () => {
+  return (
+    <div style={{ width: '100%', height: '150px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '4px', padding: '20px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+      {[...Array(20)].map((_, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            height: [20, Math.random() * 100 + 20, 20],
+            backgroundColor: ['var(--accent)', 'var(--mood-hype)', 'var(--accent)']
+          }}
+          transition={{
+            repeat: Infinity,
+            duration: Math.random() * 0.5 + 0.5,
+            delay: i * 0.05
+          }}
+          style={{ width: '8px', borderRadius: '4px', background: 'var(--accent)' }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const GravityTiles = () => {
+  const [hovered, setHovered] = useState(null);
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', width: '100%', padding: '10px' }}>
+      {[...Array(12)].map((_, i) => (
+        <motion.div
+          key={i}
+          onMouseEnter={() => setHovered(i)}
+          onMouseLeave={() => setHovered(null)}
+          animate={{
+            scale: hovered === i ? 1.2 : 1,
+            rotateZ: hovered === i ? 15 : 0,
+            backgroundColor: hovered === i ? 'var(--vibe-primary)' : 'rgba(255,255,255,0.05)'
+          }}
+          style={{ height: '40px', borderRadius: '10px', border: '1px solid var(--glass-border)', cursor: 'pointer' }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const VibePulse = () => (
+  <motion.div
+    animate={{
+      scale: [1, 1.1, 1],
+      opacity: [0.3, 0.6, 0.3]
+    }}
+    transition={{ repeat: Infinity, duration: 2 }}
+    style={{
+      width: '100px',
+      height: '100px',
+      borderRadius: '50%',
+      background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)',
+      filter: 'blur(20px)',
+      position: 'absolute',
+      pointerEvents: 'none'
+    }}
+  />
+);
+
 const MagneticButton = ({ children, className, onClick, onMouseEnter, style }) => {
   const btnRef = useRef(null);
   const [x, setX] = useState(0);
@@ -114,8 +176,8 @@ function App() {
   const [activeArtistData, setActiveArtistData] = useState(null);
   const [pulseData, setPulseData] = useState({ active: false, color: null });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isShaking, setIsShaking] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
+  const [isCurationOpen, setIsCurationOpen] = useState(true);
   const volumeNotchRef = useRef(0);
 
   const triggerPulse = (direction) => {
@@ -124,15 +186,32 @@ function App() {
     if (direction === 'right' || direction === 'up') color = '#00e676';
     setPulseData({ active: true, color });
     setTimeout(() => setPulseData({ active: false, color: null }), 1200);
-    setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 200);
   };
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
+    const handleKeyDown = (e) => {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+      if (!songs || songs.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowLeft': handleSwipe('left', songs[0]); break;
+        case 'ArrowRight': handleSwipe('right', songs[0], true); break;
+        case 'ArrowUp': handleSwipe('up', songs[0], true); break;
+        case 'Backspace': handleRewind(); break;
+        case '+': case '=': handleAddToLibrary(); break;
+        case 'm': case 'M': setIsMuted(prev => !prev); break;
+        case 'l': case 'L': setTheme(prev => prev === 'dark' ? 'light' : 'dark'); break;
+        default: break;
+      }
+    };
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [songs, token, currentSeed, history]);
 
   const playUISound = (type = 'click') => {
     try {
@@ -333,10 +412,7 @@ function App() {
     setLastAction("Rewind!"); setTimeout(() => setLastAction(null), 1500);
   };
 
-  const handleAddToLibrary = () => { if (songs.length > 0) setIsAddModalOpen(true); };
-  const handleAddModalClose = (result) => {
-    setIsAddModalOpen(false); if (result?.success) { setLastAction(result.message); setTimeout(() => setLastAction(null), 3000); }
-  };
+  const handleAddToLibrary = () => { if (songs.length > 0) setIsCurationOpen(true); };
 
   if (!token) {
     return (
@@ -376,9 +452,46 @@ function App() {
             <PerspectiveCard className="gimmick-card">
               <Sparkles size={64} color="var(--mood-chill)" style={{ color: 'var(--mood-chill)' }} />
               <h3>ULTRA FLUID</h3>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 12 }}>Physics-based UI for music lovers.</p>
-              <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center' }}>
-                {[1, 2, 3].map(i => <motion.div key={i} whileHover={{ y: -20, rotate: 180 }} style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--glass-border)' }} />)}
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 12, marginBottom: 20 }}>Physics-based UI for music lovers.</p>
+              <GravityTiles />
+            </PerspectiveCard>
+          </div>
+        </section>
+
+        <section className="snap-section feature-snap" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <h2 className="vibe-text" style={{ top: '15%', opacity: 0.1 }}>SENSORY.</h2>
+          <div className="vibe-card-grid">
+            <PerspectiveCard className="gimmick-card">
+              <Music size={64} color="var(--accent)" />
+              <h3>SONIC SCANNER</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Real-time playback visualization.</p>
+              <FrequencyScanner />
+            </PerspectiveCard>
+            <PerspectiveCard className="gimmick-card">
+              <Globe size={64} color="var(--accent)" />
+              <h3>GLOBAL SYNC</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Synchronized with the world's library.</p>
+              <div style={{ position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <VibePulse />
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}>
+                  <Globe size={80} style={{ opacity: 0.2 }} />
+                </motion.div>
+              </div>
+            </PerspectiveCard>
+            <PerspectiveCard className="gimmick-card">
+              <Cpu size={64} color="var(--mood-hype)" />
+              <h3>NEURAL MATCH</h3>
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>AI-driven discovery engine.</p>
+              <div style={{ padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '15px' }}>
+                {[1, 2, 3].map(i => (
+                  <motion.div
+                    key={i}
+                    initial={{ width: '0%' }}
+                    animate={{ width: ['20%', '100%', '20%'] }}
+                    transition={{ repeat: Infinity, duration: 4, delay: i * 0.5 }}
+                    style={{ height: '6px', background: 'var(--accent)', borderRadius: '3px', marginBottom: '10px', opacity: 0.3 }}
+                  />
+                ))}
               </div>
             </PerspectiveCard>
           </div>
@@ -412,11 +525,12 @@ function App() {
   }
 
   return (
-    <div className={`app-container ${theme}-theme ${isShaking ? 'screen-shake' : ''}`}>
+    <div className={`app-container ${theme}-theme`}>
       <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 35, stiffness: 120, mass: 0.6 }} />
       <AnimatedBackground />
       <MusicParticles color="var(--accent)" />
       <PlaylistSidebar onPlaylistSelect={handlePlaylistSelect} currentPlaylist={currentSeed} isOpen={isLibraryOpen} onToggle={() => setIsLibraryOpen(!isLibraryOpen)} />
+      <CurationSidebar isOpen={isCurationOpen} onToggle={() => setIsCurationOpen(!isCurationOpen)} song={songs[0]} user={user} onActionComplete={(res) => setLastAction(res.message)} />
       <div className="main-content">
         <header className="header">
           <div className="header-left" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -426,7 +540,6 @@ function App() {
           <div className="user-avatar">{user?.images?.[0] ? <img src={user.images[0].url} style={{ width: 32, height: 32, borderRadius: '50%' }} /> : <User size={24} />}</div>
         </header>
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} showVisuals={showVisuals} setShowVisuals={setShowVisuals} user={user} />
-        {songs.length > 0 && (<AddToPlaylistModal isOpen={isAddModalOpen} onClose={handleAddModalClose} song={songs[0]} user={user} />)}
         <AnimatePresence>{lastAction && (<motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="toast-notification">{lastAction}</motion.div>)}</AnimatePresence>
         <div className="main-layout">
           <div className="side-controls left">
@@ -459,14 +572,6 @@ function App() {
               <MagneticButton className="control-btn nope" onClick={() => handleSwipe('left', songs[0])} onMouseEnter={() => playUISound('click')}><X size={28} /></MagneticButton>
               <MagneticButton className="control-btn super" onClick={handleRewind} onMouseEnter={() => playUISound('click')}><RotateCcw size={28} /></MagneticButton>
               <MagneticButton className="control-btn like" onClick={() => handleSwipe('right', songs[0])} onMouseEnter={() => playUISound('click')}><Heart size={28} /></MagneticButton>
-            </div>
-          </div>
-          <div className="side-controls right">
-            <div className={`insights-panel ${activeArtistData ? 'visible' : ''}`}>
-              <div className="insight-section"><h4>Genres</h4><div style={{ display: 'flex', flexWrap: 'wrap' }}>{activeArtistData?.genres?.slice(0, 3).map(g => <span key={g} className="genre-tag">{g}</span>) || <span className="genre-tag">General</span>}</div></div>
-              <div className="global-action-container">
-                <MagneticButton className="global-action-btn" onClick={handleAddToLibrary} onMouseEnter={() => playUISound('click')} style={{ background: 'var(--vibe-primary)' }}><Plus size={32} color="white" /></MagneticButton>
-              </div>
             </div>
           </div>
         </div>

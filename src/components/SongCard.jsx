@@ -3,7 +3,7 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Music2, Play, Pause, Plus, Volume2, VolumeX, BarChart, Calendar, Zap, Info } from 'lucide-react';
 import './SongCard.css';
 
-const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwipe, volume = 1, theme = 'dark' }) => {
+const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwipe, volume = 1, theme = 'dark', onAdd }) => {
     // Motion Values
     const x = useMotionValue(0);
     const y = useMotionValue(0);
@@ -119,6 +119,11 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
             if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
             else { audioRef.current.play(); setIsPlaying(true); }
         }
+    };
+
+    const handleAddClick = (e) => {
+        e.stopPropagation();
+        onAdd();
     };
 
     const likeOpacity = useTransform(x, [50, 150], [0, 1]);

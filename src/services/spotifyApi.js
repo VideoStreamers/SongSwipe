@@ -23,27 +23,29 @@ export async function getRecommendations(seedTracks = [], seedGenres = [], seedA
 
     // Strategy A: Direct Seed Search
     if (seedArtists.length > 0) {
-        fetchPromises.push(searchForTracks(`artist:"${seedArtists[0]}"${mood === 'hype' ? ' label:major' : ''}`, Math.floor(Math.random() * 20), token));
+        fetchPromises.push(searchForTracks(`artist:"${seedArtists[0]}"${mood === 'hype' ? ' label:major' : ''}`, Math.floor(Math.random() * 5), token));
     } else if (seedGenres.length > 0) {
-        fetchPromises.push(searchForTracks(`genre:"${seedGenres[0]}"${moodQuery}`, Math.floor(Math.random() * 50), token));
+        fetchPromises.push(searchForTracks(`genre:"${seedGenres[0]}"`, Math.floor(Math.random() * 10), token));
     }
 
-    // Strategy B: "Vibe Exploration"
-    const explorerGenres = mood === 'hype' ? ['dance', 'hip-hop', 'electronic'] :
-        mood === 'chill' ? ['lo-fi', 'ambient', 'acoustic'] :
-            ['indie', 'indie-pop', 'house', 'synthwave'];
+    // Strategy B: "Vibe Exploration" (Broadened for reliability)
+    const explorerGenres = mood === 'hype' ? ['dance', 'hip-hop', 'electronic', 'pop'] :
+        mood === 'chill' ? ['lo-fi', 'ambient', 'acoustic', 'jazz'] :
+            ['indie', 'house', 'synthwave', 'alternative', 'rock'];
+
     const randomGenre = explorerGenres[Math.floor(Math.random() * explorerGenres.length)];
-    const randomYear = mood === 'hype' ? 2024 : 2010 + Math.floor(Math.random() * 14);
-    fetchPromises.push(searchForTracks(`genre:"${randomGenre}" year:${randomYear}`, Math.floor(Math.random() * 50), token));
+    // Lower offset to prevent skipping results in niche genres
+    fetchPromises.push(searchForTracks(`genre:"${randomGenre}"`, Math.floor(Math.random() * 10), token));
+    fetchPromises.push(searchForTracks(`year:2024-2025`, Math.floor(Math.random() * 100), token));
 
     // Strategy C: "Trending Discovery" (Seed-based Context)
     if (seedTracks.length > 0) {
         try {
-            // Get more details about the first seed track to find better matching genres
             const trackInfo = await spotify.getTrack(seedTracks[0]);
             const artistInfo = await spotify.getArtist(trackInfo.artists[0].id);
             if (artistInfo.genres && artistInfo.genres.length > 0) {
-                fetchPromises.push(searchForTracks(`genre:"${artistInfo.genres[0]}"`, Math.floor(Math.random() * 20), token));
+                // Use the artist's first genre but keep offset low
+                fetchPromises.push(searchForTracks(`genre:"${artistInfo.genres[0]}"`, 0, token));
             }
         } catch (e) { /* silent fail */ }
     }
@@ -57,7 +59,6 @@ export async function getRecommendations(seedTracks = [], seedGenres = [], seedA
         // Priority 1: Native previews
         if (a.preview_url && !b.preview_url) return -1;
         if (!a.preview_url && b.preview_url) return 1;
-        // Priority 2: Popularity (reduce generic filler)
         return b.popularity - a.popularity;
     });
 
@@ -70,8 +71,6 @@ export async function getRecommendations(seedTracks = [], seedGenres = [], seedA
         if (!seenIds.has(t.id)) {
             const artistId = t.artists[0]?.id;
             const count = artistCounts[artistId] || 0;
-
-            // Limit to max 2 tracks per artist to prevent spamming their discography
             if (count < 2) {
                 seenIds.add(t.id);
                 unique.push(t);
@@ -81,15 +80,12 @@ export async function getRecommendations(seedTracks = [], seedGenres = [], seedA
     }
 
     if (unique.length === 0) {
-        console.log("Discovery failed. Using resilient fallback search...");
+        console.warn("Discovery engine returned 0 results. Activating Ultra-Resilient Fallback...");
         const fallbackTracks = await searchForTracks("year:2024", 0, token);
         if (fallbackTracks.length > 0) return fallbackTracks.slice(0, 25);
-
-        // Final ultimate fallback: Get tracks from a guaranteed public playlist
         return getPlaylistTracks("37i9dQZF1DXcBWIGoYBM5M");
     }
 
-    // Final Shuffle & Slice
     return unique.sort(() => 0.5 - Math.random()).slice(0, 25);
 }
 
