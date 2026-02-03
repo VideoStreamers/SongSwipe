@@ -428,10 +428,10 @@ function App() {
         // 2. Extract Deep Audio Features & Context
         let targetFeatures = {};
         try {
-          const featureTrackIds = sampledTracks.slice(0, 10).map(t => t.id); // Increased sample size
-          const features = await SpotifyApi.getAudioFeatures(featureTrackIds);
+          const featureTrackIds = sampledTracks.slice(0, 10).map(t => t.id);
+          const features = await SpotifyApi.getAudioFeatures(featureTrackIds).catch(() => null);
 
-          if (features && features.length > 0) {
+          if (features && Array.isArray(features)) {
             const valid = features.filter(Boolean);
             if (valid.length > 0) {
               const avg = (key) => valid.reduce((sum, f) => sum + (f[key] || 0), 0) / valid.length;

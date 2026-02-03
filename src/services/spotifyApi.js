@@ -185,10 +185,11 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
     const token = spotify.getAccessToken();
 
     // 1. Try Real Recommendations API (Best Quality)
+    // LIMIT: Max 5 seeds total. Using 2 tracks + 2 genres = 4 seeds (safe)
     try {
         const res = await spotify.getRecommendations({
-            seed_tracks: seedTracks.slice(0, 3),
-            seed_genres: seedGenres.slice(0, 2),
+            seed_tracks: seedTracks.slice(0, 2),
+            seed_genres: seedGenres.slice(0, 2).map(g => g.toLowerCase().replace(/ /g, '-')),
             limit: 20,
             ...targetFeatures
         });
@@ -198,7 +199,7 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
         }
     } catch (e) {
         // Fallback if API is restricted/quota exceeded
-        console.warn("Standard Recs API failed, switching to Search Strategy...");
+        console.warn("Standard Recs API failed, switching to Search Strategy...", e);
     }
 
     // 2. Search Strategy (Strict)
