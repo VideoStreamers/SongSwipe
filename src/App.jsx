@@ -155,7 +155,7 @@ const MagneticButton = ({ children, className, onClick, onMouseEnter, style }) =
 // ============================================================================
 
 function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('spotify_token') || null);
+  const [token, setToken] = useState(null);
   const [songs, setSongs] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -277,7 +277,6 @@ function App() {
       window.history.pushState({}, null, "/songswipe/");
       getAccessToken(code).then(accessToken => {
         setToken(accessToken);
-        localStorage.setItem('spotify_token', accessToken);
         SpotifyApi.setAccessToken(accessToken);
         fetchInitialData();
       });
