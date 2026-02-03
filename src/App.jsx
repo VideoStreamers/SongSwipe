@@ -273,7 +273,7 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code) {
-      window.history.pushState({}, null, "/");
+      window.history.pushState({}, null, "/songswipe/");
       getAccessToken(code).then(accessToken => {
         setToken(accessToken); SpotifyApi.setAccessToken(accessToken); fetchInitialData();
       });
