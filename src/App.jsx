@@ -425,20 +425,36 @@ function App() {
           .slice(0, 3)                 // Take top 3
           .map(([g]) => g);
 
-        // 2. Extract Audio Features (Energy, Tempo, etc.)
+        // 2. Extract Deep Audio Features & Context
         let targetFeatures = {};
         try {
-          const featureTrackIds = sampledTracks.slice(0, 5).map(t => t.id); // Analyze first 5
+          const featureTrackIds = sampledTracks.slice(0, 10).map(t => t.id); // Increased sample size
           const features = await SpotifyApi.getAudioFeatures(featureTrackIds);
 
           if (features && features.length > 0) {
             const valid = features.filter(Boolean);
             if (valid.length > 0) {
               const avg = (key) => valid.reduce((sum, f) => sum + (f[key] || 0), 0) / valid.length;
+              const avgPopularity = sampledTracks.reduce((sum, t) => sum + (t.popularity || 50), 0) / sampledTracks.length;
+
               targetFeatures = {
+                // Core Vibe
                 target_energy: avg('energy'),
                 target_danceability: avg('danceability'),
-                target_valence: avg('valence')
+                target_valence: avg('valence'),
+                target_tempo: avg('tempo'),
+
+                // Advanced Texture
+                target_acousticness: avg('acousticness'),
+                target_instrumentalness: avg('instrumentalness'),
+                target_speechiness: avg('speechiness'),
+
+                // Context
+                target_popularity: Math.round(avgPopularity),
+
+                // Variance
+                min_energy: Math.max(0, avg('energy') - 0.2),
+                max_energy: Math.min(1, avg('energy') + 0.2),
               };
             }
           }
