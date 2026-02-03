@@ -379,8 +379,19 @@ function App() {
         setCurrentSeed({ type: 'top-tracks', name: 'My Top Tracks', id: null });
       } else {
         const tracks = await SpotifyApi.getPlaylistTracks(playlist.id);
-        const shuffled = [...tracks].sort(() => 0.5 - Math.random());
-        seedIds = shuffled.slice(0, 5).map(t => t.id);
+
+        // Better seed selection: take tracks from different parts of the playlist
+        const playlistSize = tracks.length;
+        const seedCount = Math.min(5, playlistSize);
+        const step = Math.floor(playlistSize / seedCount);
+
+        // Get evenly distributed tracks across the playlist
+        seedIds = [];
+        for (let i = 0; i < seedCount; i++) {
+          const index = Math.min(i * step, playlistSize - 1);
+          seedIds.push(tracks[index].id);
+        }
+
         setCurrentSeed({ type: 'playlist', name: playlist.name, id: playlist.id });
       }
       const recs = await SpotifyApi.getRecommendations(seedIds, [], [], 'discovery'); setSongs(recs);
