@@ -6,6 +6,8 @@ SongSwipe transforms Spotify into an immersive, physics-driven discovery experie
 
 🚀 **[Try Live Demo](https://seppedorissen.be/songswipe/)** | ⭐ **Star this repo if you love it!**
 
+> **⚠️ Note:** The live demo requires Spotify whitelist access (app is in Development Mode). To try it yourself, clone the repo and set up your own Spotify Developer app—it's free and takes 5 minutes!
+
 ---
 
 ## 🤖 Built with Antigravity AI
