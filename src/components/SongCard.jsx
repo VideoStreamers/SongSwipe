@@ -159,7 +159,7 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
                 <img src={song.album.images[0]?.url} alt={song.name} className="song-image" crossOrigin="anonymous" />
                 <div className="gradient-overlay" />
 
-                <div className={`play-overlay ${isPaused ? 'show' : 'hide'}`}>
+                <div className={`play-overlay ${(isPaused || !isPlaying) && isActive ? 'show' : 'hide'}`}>
                     <Play fill="white" size={32} style={{ marginLeft: 4 }} />
                 </div>
             </div>
