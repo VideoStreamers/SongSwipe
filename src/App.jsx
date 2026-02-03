@@ -425,7 +425,7 @@ function App() {
     return (
       <div className="snap-container">
         <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 30, stiffness: 100, mass: 0.5 }} />
-        <AnimatedBackground />
+        {!isMobile && <AnimatedBackground />}
 
         {/* MOBILE LANDING PAGE */}
         {isMobile && (
@@ -440,6 +440,10 @@ function App() {
               <h1 className="mobile-title">SongSwipe</h1>
               <p className="mobile-subtitle">Tactile music discovery</p>
               <button className="login-btn mobile-login" onClick={redirectToAuthCodeFlow}>ENTER</button>
+              <div className="mobile-credits">
+                <span>Created by <strong>Seppe Dorissen</strong></span>
+                <span className="ai-note" style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: 4 }}>Experimental AI Concept Build</span>
+              </div>
             </div>
           </section>
         )}
