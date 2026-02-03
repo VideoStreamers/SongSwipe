@@ -155,7 +155,7 @@ const MagneticButton = ({ children, className, onClick, onMouseEnter, style }) =
 // ============================================================================
 
 function App() {
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('spotify_token') || null);
   const [songs, setSongs] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -276,7 +276,10 @@ function App() {
     if (code) {
       window.history.pushState({}, null, "/songswipe/");
       getAccessToken(code).then(accessToken => {
-        setToken(accessToken); SpotifyApi.setAccessToken(accessToken); fetchInitialData();
+        setToken(accessToken);
+        localStorage.setItem('spotify_token', accessToken);
+        SpotifyApi.setAccessToken(accessToken);
+        fetchInitialData();
       });
     }
   }, []);
@@ -373,29 +376,57 @@ function App() {
   const handlePlaylistSelect = async (playlist) => {
     setLoading(true); setSongs([]); setHistory([]); setActiveSongId(null); setIsPaused(false);
     try {
-      let seedIds = [];
+      let allRecs = [];
+
       if (!playlist) {
-        const top = await SpotifyApi.getTopTracks(); seedIds = top.map(t => t.id).slice(0, 5);
+        const top = await SpotifyApi.getTopTracks();
+        const seedIds = top.map(t => t.id).slice(0, 5);
         setCurrentSeed({ type: 'top-tracks', name: 'My Top Tracks', id: null });
+        allRecs = await SpotifyApi.getRecommendations(seedIds, [], [], 'discovery');
       } else {
         const tracks = await SpotifyApi.getPlaylistTracks(playlist.id);
-
-        // Better seed selection: take tracks from different parts of the playlist
         const playlistSize = tracks.length;
-        const seedCount = Math.min(5, playlistSize);
-        const step = Math.floor(playlistSize / seedCount);
 
-        // Get evenly distributed tracks across the playlist
-        seedIds = [];
-        for (let i = 0; i < seedCount; i++) {
-          const index = Math.min(i * step, playlistSize - 1);
-          seedIds.push(tracks[index].id);
+        // Sample 15 tracks from beginning, middle, and end sections
+        const sampleSize = Math.min(15, playlistSize);
+        const sampledTracks = [];
+        const sections = 3;
+        const tracksPerSection = Math.floor(sampleSize / sections);
+
+        for (let section = 0; section < sections; section++) {
+          const sectionStart = Math.floor((playlistSize / sections) * section);
+          const sectionEnd = Math.floor((playlistSize / sections) * (section + 1));
+          const sectionSize = sectionEnd - sectionStart;
+
+          for (let i = 0; i < tracksPerSection; i++) {
+            const step = Math.floor(sectionSize / tracksPerSection);
+            const index = sectionStart + (i * step);
+            if (index < playlistSize) sampledTracks.push(tracks[index]);
+          }
         }
+
+        // Make multiple API calls with different seed combinations
+        const seedGroups = [];
+        for (let i = 0; i < sampledTracks.length; i += 5) {
+          seedGroups.push(sampledTracks.slice(i, i + 5).map(t => t.id));
+        }
+
+        const recPromises = seedGroups.map(seeds =>
+          SpotifyApi.getRecommendations(seeds, [], [], 'discovery')
+        );
+
+        const recResults = await Promise.all(recPromises);
+        allRecs = recResults.flat();
+
+        // Remove duplicates and shuffle
+        const uniqueRecs = Array.from(new Map(allRecs.map(s => [s.id, s])).values());
+        allRecs = uniqueRecs.sort(() => 0.5 - Math.random());
 
         setCurrentSeed({ type: 'playlist', name: playlist.name, id: playlist.id });
       }
-      const recs = await SpotifyApi.getRecommendations(seedIds, [], [], 'discovery'); setSongs(recs);
-      if (recs.length > 0) { updateVibe(recs[0]); setActiveSongId(recs[0].id); }
+
+      setSongs(allRecs);
+      if (allRecs.length > 0) { updateVibe(allRecs[0]); setActiveSongId(allRecs[0].id); }
     } catch (e) { console.error("Failed to load playlist seeds", e); }
     setLoading(false);
   };
