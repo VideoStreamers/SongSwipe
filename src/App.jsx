@@ -418,7 +418,15 @@ function App() {
     if (newSongs.length > 0) { updateVibe(newSongs[0]); setActiveSongId(newSongs[0].id); triggerPulse(direction); }
     if (newSongs.length < 3) {
       const more = await SpotifyApi.getRecommendations([song.id], [], [], 'discovery');
-      const fresh = more.filter(s => !new Set(newSongs.map(x => x.id)).has(s.id));
+
+      // Filter out duplicates from both current queue AND history
+      const seenIds = new Set([
+        ...newSongs.map(x => x.id),
+        ...history.map(x => x.id),
+        song.id // Also exclude the song we just swiped
+      ]);
+
+      const fresh = more.filter(s => !seenIds.has(s.id));
       setSongs([...newSongs, ...fresh]);
     }
   };
