@@ -4,7 +4,7 @@
 
 SongSwipe transforms Spotify into an immersive, physics-driven discovery experience. Swipe through AI-curated recommendations, build playlists in real-time, and feel every track's vibe through dynamic chromatic extraction and adaptive UI.
 
-🚀 **[Try Live Demo](https://seppedorissen.be/songswipe/)** | 🎥 **[Watch Demo Video](#)** | ⭐ **Star this repo if you love it!**
+🚀 **[Try Live Demo](https://seppedorissen.be/songswipe/)** | ⭐ **Star this repo if you love it!**
 
 ---
 
