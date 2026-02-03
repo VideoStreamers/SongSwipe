@@ -491,7 +491,7 @@
 
 .scroll-indicator {
   position: absolute;
-  bottom: 160px;
+  bottom: 30px;
   font-size: 0.75rem;
   font-weight: 950;
   text-transform: uppercase;
