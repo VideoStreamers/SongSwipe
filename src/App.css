@@ -602,3 +602,102 @@
   text-transform: uppercase;
   letter-spacing: 2px;
 }
+
+/* ============================================================================
+   MOBILE RESPONSIVENESS (ULTRA FLUID)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .main-layout {
+    gap: 20px;
+    flex-direction: column;
+    padding-top: 60px;
+  }
+
+  .main-title {
+    font-size: 3.2rem;
+    letter-spacing: -1px;
+  }
+
+  .demo-window {
+    padding: 60px 30px;
+    border-radius: 40px;
+  }
+
+  .login-btn {
+    padding: 20px 40px !important;
+    font-size: 1.2rem !important;
+  }
+
+  .vibe-text {
+    font-size: 4rem;
+  }
+
+  .vibe-card-grid {
+    flex-direction: column;
+    gap: 24px;
+    padding: 0 20px;
+  }
+
+  .gimmick-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 40px 30px;
+  }
+
+  .swipe-deck {
+    width: 320px;
+    height: 540px;
+  }
+
+  .deck-title {
+    font-size: 2.2rem;
+  }
+
+  .controls {
+    gap: 30px;
+    margin-top: 20px;
+  }
+
+  .control-btn {
+    width: 65px;
+    height: 65px;
+  }
+
+  .side-controls.left {
+    display: none;
+    /* Hide volume/history stack on mobile to focus on swipe */
+  }
+
+  .header {
+    padding: 20px;
+  }
+
+  .theme-toggle {
+    padding: 8px 16px;
+    font-size: 0.6rem;
+  }
+
+  /* Sidebar adjustments for mobile */
+  .sidebar-container,
+  .curation-container {
+    width: 90%;
+    z-index: 2000;
+  }
+
+  .sidebar-tab,
+  .curation-tab {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (max-height: 700px) {
+  .swipe-deck {
+    height: 480px;
+  }
+
+  .controls {
+    margin-top: 15px;
+  }
+}
