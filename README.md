@@ -8,6 +8,11 @@ SongSwipe is a high-performance, physics-based music discovery dashboard that tu
 
 ---
 
+## 🤖 Built with Antigravity AI
+This project was developed in a single high-intensity session in collaboration with **Antigravity**, an agentic AI coding assistant designed by the **Google DeepMind** team. By leveraging advanced agentic workflows, we were able to move from a concept to a high-performance, physics-driven production app in record time.
+
+---
+
 ## ✨ Key Features
 
 ### 🎭 Dual-Sidebar discovery Theater
