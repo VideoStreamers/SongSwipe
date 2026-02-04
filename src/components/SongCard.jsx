@@ -199,6 +199,12 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
                     loop
                     onError={handleAudioError}
                     crossOrigin="anonymous"
+                    onPlay={(e) => {
+                        // Connect to Visualizer when play starts
+                        import('../services/audioManager').then(({ audioManager }) => {
+                            audioManager.connectElement(e.target);
+                        });
+                    }}
                 />
             )}
 
