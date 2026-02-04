@@ -122,7 +122,7 @@
   position: fixed;
   width: 200px;
   height: 200px;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  /* background: defined in JSX via style prop for dynamic color */
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;

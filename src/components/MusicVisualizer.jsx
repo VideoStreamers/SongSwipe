@@ -19,6 +19,7 @@ const MusicVisualizer = ({ isActive, color }) => {
 
             // BLURRY EDGES for the bars themselves (High performance cost, but good for aesthetic)
             ctx.filter = 'blur(12px)';
+            ctx.globalCompositeOperation = 'screen'; // GLOW EFFECT
 
             // Calculate spacing based on increased FFT (256 bins -> ~128 usable)
             const barWidth = (canvas.width / bufferLength) * 2;
@@ -32,28 +33,22 @@ const MusicVisualizer = ({ isActive, color }) => {
                 // Determine Fill Color with Transparency
                 let fillStyle;
                 if (color) {
-                    // Try to use the passed color
-                    // We assume color is 'rgb(r, g, b)' or hex. 
-                    // Safest to just set shadowColor and fillStyle logic
-
-                    // Simple Hack: If color provided, use it. If it's a var(), we can't easily canvas it.
-                    // So we fallback to a soft white/colored tint if color prop is complex.
-                    // But assume 'rgb' from ColorThief.
-
                     if (color.startsWith('rgb')) {
                         const base = color.replace('rgb', 'rgba').replace(')', '');
                         const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-                        gradient.addColorStop(0, `${base}, 0.1)`);
-                        gradient.addColorStop(1, `${base}, 0.5)`);
+                        // LIGHTER / BRIGHTER OPACITY (0.3 -> 0.8)
+                        gradient.addColorStop(0, `${base}, 0.3)`);
+                        gradient.addColorStop(1, `${base}, 0.8)`);
                         fillStyle = gradient;
                     } else {
-                        fillStyle = 'rgba(255, 255, 255, 0.2)'; // Fallback
+                        // Hex or other? Fallback
+                        fillStyle = 'rgba(255, 255, 255, 0.4)';
                     }
                 } else {
                     // Simple Green Tint Default
                     const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-                    gradient.addColorStop(0, 'rgba(29, 185, 84, 0.1)');
-                    gradient.addColorStop(1, 'rgba(29, 185, 84, 0.4)');
+                    gradient.addColorStop(0, 'rgba(29, 185, 84, 0.3)');
+                    gradient.addColorStop(1, 'rgba(29, 185, 84, 0.8)');
                     fillStyle = gradient;
                 }
 
@@ -67,7 +62,7 @@ const MusicVisualizer = ({ isActive, color }) => {
                     ctx.fill();
                 } else {
                     // Sleep mode: Tiny bars
-                    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
                     ctx.fillRect(x, canvas.height - 4, barWidth, 4);
                 }
 

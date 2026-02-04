@@ -699,9 +699,9 @@ function App() {
           scale: [1, 1.05, 1],
         }}
         style={{
-          backgroundColor: pulseData.color || vibeColor,
-          mixBlendMode: 'difference',
-          filter: 'blur(24px)',
+          background: `radial-gradient(circle, ${pulseData.color || vibeColor} 0%, transparent 60%)`,
+          mixBlendMode: 'screen', // Lighter blend mode
+          filter: 'blur(24px) brightness(1.3)', // Brighter!
         }}
         transition={{
           default: { type: 'spring', damping: 35, stiffness: 120, mass: 0.6 },
