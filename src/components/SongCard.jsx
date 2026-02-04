@@ -58,7 +58,10 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
                     audioRef.current.volume = volume * volume;
                     audioRef.current.play()
                         .then(() => setIsPlaying(true))
-                        .catch(() => setIsPlaying(false));
+                        .catch(e => {
+                            if (e.name !== 'AbortError') console.warn('Audio play failed', e);
+                            setIsPlaying(false);
+                        });
                 }
             }, 600);
             return () => {

@@ -220,15 +220,24 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
                 .filter(Boolean);
         }
 
+        // STRATEGY: Prefer Track Seeds over Genre Seeds
+        // Track seeds contain the most "vibe" information. Mixing them with genres often causes 404s.
         const params = {
-            seed_tracks: seedTracks.slice(0, 2), // 2 Tracks
             limit: 20,
             ...targetFeatures
         };
 
-        // Only add genres if we have valid ones, otherwise rely on tracks
-        if (safeGenres.length > 0) {
-            params.seed_genres = safeGenres.slice(0, 2); // + Max 2 Genres
+        if (seedTracks.length > 0) {
+            // If we have tracks, use up to 4 track seeds and ignore genres
+            params.seed_tracks = seedTracks.slice(0, 4);
+        } else {
+            // ONLY use genres if no tracks available
+            if (safeGenres.length > 0) {
+                params.seed_genres = safeGenres.slice(0, 3);
+            } else {
+                // Absolute fallback
+                params.seed_genres = ['pop'];
+            }
         }
 
         const res = await spotify.getRecommendations(params);
