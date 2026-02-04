@@ -688,7 +688,12 @@ function App() {
 
   return (
     <div className={`app-container ${theme}-theme`}>
-      <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 35, stiffness: 120, mass: 0.6 }} />
+      <motion.div
+        className="liquid-cursor"
+        animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }}
+        style={{ backgroundColor: pulseData.color || 'var(--accent)' }}
+        transition={{ type: 'spring', damping: 35, stiffness: 120, mass: 0.6 }}
+      />
       <AnimatedBackground />
       <MusicParticles color="var(--accent)" />
 
