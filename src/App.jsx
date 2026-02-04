@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useMotionValue } from 'framer-motion';
 import { Settings, User, X, Heart, Star, Music, Plus, RotateCcw, Zap, ChevronDown, Sparkles, Globe, Cpu, Volume2, VolumeX } from 'lucide-react';
 import SongCard from './components/SongCard';
 import PlaylistSidebar from './components/PlaylistSidebar';
@@ -178,7 +178,9 @@ function App() {
   const [activeArtistData, setActiveArtistData] = useState(null);
   const [pulseData, setPulseData] = useState({ active: false, color: null });
   const [vibeColor, setVibeColor] = useState('var(--accent)');
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  // Mouse Physics
+  const mouseX = useSpring(0, { damping: 35, stiffness: 120, mass: 0.6 });
+  const mouseY = useSpring(0, { damping: 35, stiffness: 120, mass: 0.6 });
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isCurationOpen, setIsCurationOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -193,7 +195,11 @@ function App() {
   };
 
   useEffect(() => {
-    const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
+    const handleMouseMove = (e) => {
+      // Offset by 100px to center the 200px cursor
+      mouseX.set(e.clientX - 100);
+      mouseY.set(e.clientY - 100);
+    };
     const handleKeyDown = (e) => {
       if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
       if (!songs || songs.length === 0) return;
@@ -695,11 +701,11 @@ function App() {
       <motion.div
         className="liquid-cursor"
         animate={{
-          x: mousePos.x - 100,
-          y: mousePos.y - 100,
           scale: [1, 1.05, 1],
         }}
         style={{
+          x: mouseX,
+          y: mouseY,
           background: `radial-gradient(circle, ${pulseData.color || vibeColor} 0%, transparent 60%)`,
           mixBlendMode: 'screen', // Lighter blend mode
           filter: 'blur(24px) brightness(1.3)', // Brighter!
