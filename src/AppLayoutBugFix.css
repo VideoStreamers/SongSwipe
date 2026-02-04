@@ -1,0 +1,59 @@
+/* FIX LAYOUT CENTERING */
+.main-content {
+    flex: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    z-index: 5;
+}
+
+.main-layout {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+/* Float the volume/history to the left of the deck without pushing the deck off-center */
+.side-controls.left {
+    position: absolute;
+    /* Deck is approx 350px width. Center is 50%. Left Edge is calc(50% - 175px).
+       We want to be left of that. Say 50px gap. 
+       calc(50% - 175px - 50px - width_of_controls(50px?)) -> calc(50% - 275px) */
+    left: calc(50% - 300px);
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    align-items: center;
+    z-index: 50;
+    top: 50%;
+    transform: translateY(-50%);
+    /* Center vertically relative to deck area */
+}
+
+/* Ensure Deck Container centers */
+.main-layout>div:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    /* Ensure centering */
+}
+
+@media (max-width: 900px) {
+    .side-controls.left {
+        left: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .side-controls.left {
+        display: none;
+    }
+}

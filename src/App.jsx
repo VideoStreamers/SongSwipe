@@ -10,6 +10,7 @@ import MusicParticles from './components/MusicParticles';
 import MusicVisualizer from './components/MusicVisualizer';
 import './components/AnimatedBackground.css';
 import './App.css';
+import './AppLayoutBugFix.css';
 import { redirectToAuthCodeFlow, getAccessToken } from './services/spotifyAuth';
 import * as SpotifyApi from './services/spotifyApi';
 import ColorThief from 'colorthief';
