@@ -158,7 +158,9 @@ export async function searchPlaylists(query) {
 export async function getPlaylistTracks(playlistId) {
     try {
         const res = await spotify.getPlaylistTracks(playlistId);
-        return res.items.map(item => item ? item.track : null).filter(Boolean);
+        return res.items
+            .map(item => item ? item.track : null)
+            .filter(t => t && t.id && !t.is_local && t.uri.startsWith('spotify:track:'));
     } catch (e) {
         console.error("Playlist fetch failed (404/403)", e);
         return [];
@@ -221,21 +223,14 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
         }
 
         // STRATEGY: Prefer Track Seeds over Genre Seeds
-        // Track seeds contain the most "vibe" information. Mixing them with genres often causes 404s.
-        const params = {
-            limit: 20,
-            ...targetFeatures
-        };
+        const params = { limit: 20, ...targetFeatures };
 
         if (seedTracks.length > 0) {
-            // If we have tracks, use up to 4 track seeds and ignore genres
             params.seed_tracks = seedTracks.slice(0, 4);
         } else {
-            // ONLY use genres if no tracks available
             if (safeGenres.length > 0) {
                 params.seed_genres = safeGenres.slice(0, 3);
             } else {
-                // Absolute fallback
                 params.seed_genres = ['pop'];
             }
         }
@@ -243,10 +238,28 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
         const res = await spotify.getRecommendations(params);
 
         if (res.tracks && res.tracks.length > 0) {
-            return res.tracks.filter(t => t.preview_url); // Prefer tracks with previews
+            return res.tracks.filter(t => t.preview_url);
         }
     } catch (e) {
-        console.warn("Standard Recs API failed, switching to Search Strategy...", e);
+        console.warn("Batch Recs API failed, trying iterative fallback...", e);
+
+        // ITERATIVE FALLBACK: Try seeds one by one
+        // If batch fails, one seed might be invalid. Try them individually.
+        if (seedTracks.length > 0) {
+            for (let i = 0; i < Math.min(seedTracks.length, 5); i++) {
+                try {
+                    const res = await spotify.getRecommendations({
+                        seed_tracks: [seedTracks[i]], // Single seed
+                        limit: 20,
+                        ...targetFeatures
+                    });
+                    if (res.tracks && res.tracks.length > 0) {
+                        console.log(`Recovered using single seed: ${seedTracks[i]}`);
+                        return res.tracks.filter(t => t.preview_url);
+                    }
+                } catch (err) { /* Continue to next seed */ }
+            }
+        }
     }
 
     // 2. Search Strategy (Strict)
