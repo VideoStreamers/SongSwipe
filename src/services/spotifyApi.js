@@ -269,13 +269,25 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
 
     if (seedGenres.length > 0) {
         seedGenres.forEach(genre => {
-            // Use RAW genre for search (works better than slugified for "Phonk")
             fetchPromises.push(searchForTracks(`genre:"${genre}"`, 0, token));
             fetchPromises.push(searchForTracks(`genre:"${genre}"`, 50, token));
-            fetchPromises.push(searchForTracks(`${genre} style`, 0, token)); // "Phonk style" often matches
+            fetchPromises.push(searchForTracks(`${genre} style`, 0, token));
         });
-    } else {
-        // Absolute fallback if no genres or tracks worked
+    }
+
+    // 3. FLAVOR INJECTION (Personalized Fail-Safe)
+    // Add search terms from User Flavor (e.g. Favorite Artists) to mix in personal taste
+    try {
+        const { UserFlavor } = await import('./userFlavor');
+        const flavorTerms = UserFlavor.getFlavorTerms();
+        if (flavorTerms.length > 0) {
+            flavorTerms.forEach(term => {
+                fetchPromises.push(searchForTracks(term, 0, token));
+            });
+        }
+    } catch (e) { /* Ignore flavor loading errors */ }
+
+    if (fetchPromises.length === 0) {
         fetchPromises.push(searchForTracks(`year:2024`, 0, token));
     }
 
@@ -290,6 +302,34 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
             seenIds.add(t.id);
             unique.push(t);
         }
+    }
+
+    // 4. VIBE CHECK (Strict Filtering)
+    // Keep only songs that match the target vibe (Energy, Tempo)
+    // This prevents "Sad songs" appearing in "Phonk" playlist, even if they share an artist
+    if (unique.length > 0 && unique.length < 50 && targetFeatures &&
+        (targetFeatures.min_energy || targetFeatures.target_energy)) {
+
+        try {
+            // Check features for the search results
+            const featureIds = unique.slice(0, 50).map(t => t.id);
+            const features = await spotify.getAudioFeaturesForTracks(featureIds);
+            const featureMap = {};
+            features.audio_features.forEach(f => { if (f) featureMap[f.id] = f; });
+
+            const vibeFiltered = unique.filter(t => {
+                const f = featureMap[t.id];
+                if (!f) return true; // Keep if no features found (safe default)
+
+                // Check Energy (Most important for Vibe)
+                const targetEnergy = targetFeatures.target_energy || 0.5;
+                const matchesEnergy = Math.abs(f.energy - targetEnergy) < 0.3; // Within 0.3 range
+
+                return matchesEnergy;
+            });
+
+            if (vibeFiltered.length > 5) return vibeFiltered.sort(() => 0.5 - Math.random());
+        } catch (e) { /* Check failed, proceed with unfiltered */ }
     }
 
     return unique.sort(() => 0.5 - Math.random());

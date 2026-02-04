@@ -421,9 +421,15 @@ function App() {
         }
 
         const topGenres = Object.entries(genreMap)
-          .sort((a, b) => b[1] - a[1]) // Sort by frequency
-          .slice(0, 3)                 // Take top 3
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
           .map(([g]) => g);
+
+        // SAVE FLAVOR: Remember these genres for the user
+        // calculated 'topGenres' are valuable info about user taste
+        import('./services/userFlavor').then(({ UserFlavor }) => {
+          UserFlavor.addGenres(topGenres);
+        });
 
         // 2. Extract Deep Audio Features & Context
         let targetFeatures = {};
@@ -496,6 +502,13 @@ function App() {
   const processSwipe = async (direction, song) => {
     setForcedSwipe(null); setIsPaused(false);
     playUISound(direction === 'right' || direction === 'up' ? 'swipe-right' : 'swipe-left');
+
+    // RECORD FLAVOR
+    import('./services/userFlavor').then(({ UserFlavor }) => {
+      if (direction === 'right' || direction === 'up') UserFlavor.recordLike(song);
+      else if (direction === 'left') UserFlavor.recordDislike(song);
+    });
+
     if (direction === 'right') {
       if (currentSeed.id) SpotifyApi.addToPlaylist(currentSeed.id, song.uri);
       else SpotifyApi.saveTrack(song.id);
