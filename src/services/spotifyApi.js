@@ -260,22 +260,22 @@ export async function getRecommendationsWithFeatures(seedTracks, seedGenres, tar
                 } catch (err) { /* Continue to next seed */ }
             }
         }
+        console.warn("All recommendation seeds failed. Switching to Search API.");
     }
 
-    // 2. Search Strategy (Strict)
-    // ONLY search for the explicit genres from the playlist, no random "discovery" genres
+    // 2. Search Strategy (Strict & Robust)
+    // If Recommendations API failed, use Search API which supports ANY genre string (e.g. "phonk")
     const fetchPromises = [];
 
-    // Search for the specific genres from the playlist
     if (seedGenres.length > 0) {
         seedGenres.forEach(genre => {
-            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 0, token)); // Strict match
-            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 50, token)); // Diversity
-            // Try combined genre + year for freshness
-            fetchPromises.push(searchForTracks(`genre:"${genre}" year:2023-2025`, 0, token));
+            // Use RAW genre for search (works better than slugified for "Phonk")
+            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 0, token));
+            fetchPromises.push(searchForTracks(`genre:"${genre}"`, 50, token));
+            fetchPromises.push(searchForTracks(`${genre} style`, 0, token)); // "Phonk style" often matches
         });
     } else {
-        // Absolute fallback if no genres found
+        // Absolute fallback if no genres or tracks worked
         fetchPromises.push(searchForTracks(`year:2024`, 0, token));
     }
 
