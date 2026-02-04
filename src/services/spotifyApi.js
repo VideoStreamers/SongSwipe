@@ -180,25 +180,50 @@ export async function getAudioFeatures(trackIds) {
     return res.audio_features;
 }
 
-// Smart Recommendation Engine: Tries real API -> Falls back to strict Genre Search
+// Smart Recommendation Engine
 export async function getRecommendationsWithFeatures(seedTracks, seedGenres, targetFeatures) {
     const token = spotify.getAccessToken();
 
     // 1. Try Real Recommendations API (Best Quality)
-    // LIMIT: Max 5 seeds total. Using 2 tracks + 2 genres = 4 seeds (safe)
     try {
-        const res = await spotify.getRecommendations({
-            seed_tracks: seedTracks.slice(0, 2),
-            seed_genres: seedGenres.slice(0, 2).map(g => g.toLowerCase().replace(/ /g, '-')),
+        // Get valid seeds first
+        const validSeedsRes = await spotify.getAvailableGenreSeeds();
+        const validSeeds = new Set(validSeedsRes.genres);
+
+        // Filter extracted genres against valid list
+        let safeGenres = seedGenres
+            .map(g => g.toLowerCase().replace(/ /g, '-'))
+            .filter(g => validSeeds.has(g));
+
+        // If no valid genres found, use generic fallbacks based on common matches or drop genres entirely
+        if (safeGenres.length === 0) {
+            // Map common invalid genres to valid ones if possible
+            const FallbackMap = {
+                'phonk': 'electronic', 'drift-phonk': 'electronic', 'lo-fi': 'chill',
+                'rap': 'hip-hop', 'trap': 'hip-hop'
+            };
+            safeGenres = seedGenres
+                .map(g => FallbackMap[g.toLowerCase().replace(/ /g, '-')] || null)
+                .filter(Boolean);
+        }
+
+        const params = {
+            seed_tracks: seedTracks.slice(0, 2), // 2 Tracks
             limit: 20,
             ...targetFeatures
-        });
+        };
+
+        // Only add genres if we have valid ones, otherwise rely on tracks
+        if (safeGenres.length > 0) {
+            params.seed_genres = safeGenres.slice(0, 2); // + Max 2 Genres
+        }
+
+        const res = await spotify.getRecommendations(params);
 
         if (res.tracks && res.tracks.length > 0) {
             return res.tracks.filter(t => t.preview_url); // Prefer tracks with previews
         }
     } catch (e) {
-        // Fallback if API is restricted/quota exceeded
         console.warn("Standard Recs API failed, switching to Search Strategy...", e);
     }
 
