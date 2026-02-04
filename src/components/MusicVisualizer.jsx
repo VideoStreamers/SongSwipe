@@ -2,10 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { audioManager } from '../services/audioManager';
 import './MusicVisualizer.css';
 
-const MusicVisualizer = ({ isActive }) => {
+const MusicVisualizer = ({ isActive, color }) => {
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
-    const animationIdRef = useRef(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -13,43 +12,63 @@ const MusicVisualizer = ({ isActive }) => {
         let animationId;
 
         const render = () => {
-            if (!isActive) {
-                // If paused, just draw a low constant hum or fade out
-                // For now, we stop updating to save battery, or we can animate a slow "breathing" line
-                // But let's keep it simple: just stop drawing new frames but keep the last one (or clear)
-                // Actually, user wants "animates up/down", so even when paused maybe it should sleep?
-                // Let's keep loop running but check isActive inside to decide WHAT to draw
-            }
-
             const data = audioManager.getFrequencyData(); // Uint8Array [0-255]
-            const bufferLength = data.length; // 32
+            const bufferLength = data.length;
 
-            // Clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Bars
-            const barWidth = (canvas.width / bufferLength) * 2.5;
+            // BLURRY EDGES for the bars themselves (High performance cost, but good for aesthetic)
+            ctx.filter = 'blur(12px)';
+
+            // Calculate spacing based on increased FFT (256 bins -> ~128 usable)
+            const barWidth = (canvas.width / bufferLength) * 2;
             let x = 0;
 
             for (let i = 0; i < bufferLength; i++) {
-                const barHeight = (data[i] / 255) * canvas.height; // Scale to height
+                // Scale value
+                const value = data[i];
+                const barHeight = (value / 255) * canvas.height * 0.9;
 
-                // Color: Use CSS variable or static gradient
-                // We'll use a gradient based on height
-                const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-                gradient.addColorStop(0, 'rgba(29, 185, 84, 0.2)'); // Dark Green base
-                gradient.addColorStop(1, 'rgba(29, 185, 84, 0.8)'); // Bright Green top
+                // Determine Fill Color with Transparency
+                let fillStyle;
+                if (color) {
+                    // Try to use the passed color
+                    // We assume color is 'rgb(r, g, b)' or hex. 
+                    // Safest to just set shadowColor and fillStyle logic
 
-                ctx.fillStyle = gradient;
+                    // Simple Hack: If color provided, use it. If it's a var(), we can't easily canvas it.
+                    // So we fallback to a soft white/colored tint if color prop is complex.
+                    // But assume 'rgb' from ColorThief.
 
-                // Rounded top? 
-                // Simple rect for performance
-                if (isActive) {
-                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    if (color.startsWith('rgb')) {
+                        const base = color.replace('rgb', 'rgba').replace(')', '');
+                        const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+                        gradient.addColorStop(0, `${base}, 0.1)`);
+                        gradient.addColorStop(1, `${base}, 0.5)`);
+                        fillStyle = gradient;
+                    } else {
+                        fillStyle = 'rgba(255, 255, 255, 0.2)'; // Fallback
+                    }
                 } else {
-                    // "Sleeping" state visual
-                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                    ctx.fillRect(x, canvas.height - 5, barWidth, 5);
+                    // Simple Green Tint Default
+                    const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+                    gradient.addColorStop(0, 'rgba(29, 185, 84, 0.1)');
+                    gradient.addColorStop(1, 'rgba(29, 185, 84, 0.4)');
+                    fillStyle = gradient;
+                }
+
+                ctx.fillStyle = fillStyle;
+
+                if (isActive) {
+                    ctx.beginPath();
+                    // Draw rounded rect manually-ish or just rect
+                    if (ctx.roundRect) ctx.roundRect(x, canvas.height - barHeight, barWidth, barHeight, 10);
+                    else ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    ctx.fill();
+                } else {
+                    // Sleep mode: Tiny bars
+                    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+                    ctx.fillRect(x, canvas.height - 4, barWidth, 4);
                 }
 
                 x += barWidth + 2;
@@ -58,15 +77,12 @@ const MusicVisualizer = ({ isActive }) => {
             animationId = requestAnimationFrame(render);
         };
 
-        // Initialize Audio Context (user interaction required normally, but we call init on Play)
-        // audioManager.init(); 
-
         render();
 
         return () => {
             cancelAnimationFrame(animationId);
         };
-    }, [isActive]);
+    }, [isActive, color]); // Re-init if color changes
 
     // Handle Resize
     useEffect(() => {
@@ -77,7 +93,7 @@ const MusicVisualizer = ({ isActive }) => {
             }
         };
         window.addEventListener('resize', handleResize);
-        handleResize(); // Initial size
+        handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 

@@ -693,7 +693,11 @@ function App() {
       <MusicParticles color="var(--accent)" />
 
       {/* BACKGROUND VISUALIZER */}
-      <MusicVisualizer isActive={!isPaused && songs.length > 0} tempo={120} />
+      <MusicVisualizer
+        isActive={!isPaused && songs.length > 0}
+        tempo={120}
+        color={pulseData.active ? pulseData.color : null}
+      />
 
       <PlaylistSidebar onPlaylistSelect={handlePlaylistSelect} currentPlaylist={currentSeed} isOpen={isLibraryOpen} onToggle={() => setIsLibraryOpen(!isLibraryOpen)} />
       <CurationSidebar isOpen={isCurationOpen} onToggle={() => setIsCurationOpen(!isCurationOpen)} song={songs[0]} user={user} onActionComplete={(res) => setLastAction({ text: res.message, id: Date.now() })} />

@@ -12,8 +12,8 @@ class AudioContextManager {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             this.audioContext = new AudioContext();
             this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 64; // Low FFT size for simple bars (32 bins)
-            this.analyser.smoothingTimeConstant = 0.8;
+            this.analyser.fftSize = 256;
+            this.analyser.smoothingTimeConstant = 0.85;
             this.analyser.connect(this.audioContext.destination);
 
             const bufferLength = this.analyser.frequencyBinCount;
