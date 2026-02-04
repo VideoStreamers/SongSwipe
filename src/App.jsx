@@ -696,7 +696,7 @@ function App() {
       <MusicVisualizer
         isActive={!isPaused && songs.length > 0}
         tempo={120}
-        color={pulseData.active ? pulseData.color : null}
+        color={pulseData.color}
       />
 
       <PlaylistSidebar onPlaylistSelect={handlePlaylistSelect} currentPlaylist={currentSeed} isOpen={isLibraryOpen} onToggle={() => setIsLibraryOpen(!isLibraryOpen)} />
