@@ -176,6 +176,7 @@ function App() {
   const [forcedSwipe, setForcedSwipe] = useState(null);
   const [activeArtistData, setActiveArtistData] = useState(null);
   const [pulseData, setPulseData] = useState({ active: false, color: null });
+  const [vibeColor, setVibeColor] = useState('var(--accent)');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isCurationOpen, setIsCurationOpen] = useState(false);
@@ -326,8 +327,10 @@ function App() {
         const secondaryPastel = palette[1] ? transformColor(palette[1]) : transformColor([0, 0, 0]);
 
         // Update Vibe variables
-        root.style.setProperty('--vibe-primary', `rgb(${primaryPastel.join(',')})`);
+        const primaryRgb = `rgb(${primaryPastel.join(',')})`;
+        root.style.setProperty('--vibe-primary', primaryRgb);
         root.style.setProperty('--vibe-secondary', `rgb(${secondaryPastel.join(',')})`);
+        setVibeColor(primaryRgb);
 
         // Update background dynamics
         if (theme === 'dark') {
@@ -696,7 +699,7 @@ function App() {
           scale: [1, 1.05, 1],
         }}
         style={{
-          backgroundColor: pulseData.color || 'var(--accent)',
+          backgroundColor: pulseData.color || vibeColor,
           mixBlendMode: 'difference',
           filter: 'blur(24px)',
         }}
@@ -712,7 +715,7 @@ function App() {
       <MusicVisualizer
         isActive={!isPaused && songs.length > 0}
         tempo={120}
-        color={pulseData.color}
+        color={pulseData.color || vibeColor}
       />
 
       <PlaylistSidebar onPlaylistSelect={handlePlaylistSelect} currentPlaylist={currentSeed} isOpen={isLibraryOpen} onToggle={() => setIsLibraryOpen(!isLibraryOpen)} />
