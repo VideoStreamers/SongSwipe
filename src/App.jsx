@@ -563,7 +563,16 @@ function App() {
   if (!token) {
     return (
       <div className="snap-container">
-        <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 30, stiffness: 100, mass: 0.5 }} />
+        <motion.div
+          className="liquid-cursor"
+          style={{
+            x: mouseX,
+            y: mouseY,
+            background: `radial-gradient(circle, var(--accent) 0%, transparent 60%)`,
+            mixBlendMode: 'screen',
+            filter: 'blur(24px) brightness(1.3)'
+          }}
+        />
         {!isMobile && <AnimatedBackground />}
 
         {/* MOBILE LANDING PAGE */}
