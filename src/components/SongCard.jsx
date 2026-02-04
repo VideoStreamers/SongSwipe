@@ -13,7 +13,9 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
 
     // FETCH FALLBACK AUDIO (iTunes) if missing
     useEffect(() => {
-        if (isFront && !activePreviewUrl && !isFetchingPreview) {
+        // Preload preview if missing (iTunes fallback)
+        // Trigger for current song AND next 2 songs
+        if (index <= 2 && !activePreviewUrl && !isFetchingPreview) {
             const fetchFallback = async () => {
                 setIsFetchingPreview(true);
                 try {
@@ -31,7 +33,7 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
             };
             fetchFallback();
         }
-    }, [isFront, song, activePreviewUrl, isFetchingPreview]);
+    }, [index, song, activePreviewUrl, isFetchingPreview]);
 
     // React to forced swipe from Parent (keyboard/buttons)
     useEffect(() => {
@@ -201,10 +203,10 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
             )}
 
             {/* Preload next 2 songs for instant playback */}
-            {!isActive && index <= 2 && song.preview_url && (
+            {!isActive && index <= 2 && activePreviewUrl && (
                 <audio
                     preload="auto"
-                    src={song.preview_url}
+                    src={activePreviewUrl}
                     style={{ display: 'none' }}
                 />
             )}

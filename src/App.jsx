@@ -7,6 +7,7 @@ import CurationSidebar from './components/CurationSidebar';
 import SettingsModal from './components/SettingsModal';
 import AnimatedBackground from './components/AnimatedBackground';
 import MusicParticles from './components/MusicParticles';
+import MusicVisualizer from './components/MusicVisualizer';
 import './components/AnimatedBackground.css';
 import './App.css';
 import { redirectToAuthCodeFlow, getAccessToken } from './services/spotifyAuth';
@@ -510,11 +511,19 @@ function App() {
     });
 
     if (direction === 'right') {
-      if (currentSeed.id) SpotifyApi.addToPlaylist(currentSeed.id, song.uri);
-      else SpotifyApi.saveTrack(song.id);
-      setLastAction('Liked!');
-    } else if (direction === 'up') { SpotifyApi.saveTrack(song.id); setLastAction('Super Like!'); }
-    if (lastAction) setTimeout(() => setLastAction(null), 3000);
+      if (currentSeed.id) {
+        SpotifyApi.addToPlaylist(currentSeed.id, song.uri).catch(e => console.error("Add failed", e));
+      } else {
+        SpotifyApi.saveTrack(song.id).catch(e => console.error("Save failed", e));
+      }
+      setLastAction({ text: 'Liked!', id: Date.now() });
+    } else if (direction === 'up') {
+      SpotifyApi.saveTrack(song.id).catch(e => console.error("Superlike failed", e));
+      setLastAction({ text: 'Super Like!', id: Date.now() });
+    }
+
+    // Clear action after delay
+    setTimeout(() => setLastAction(null), 2000);
     setHistory(prev => [...prev, song]); const newSongs = songs.slice(1); setSongs(newSongs);
     if (newSongs.length > 0) { updateVibe(newSongs[0]); setActiveSongId(newSongs[0].id); triggerPulse(direction); }
     if (newSongs.length < 3) {
@@ -682,8 +691,12 @@ function App() {
       <motion.div className="liquid-cursor" animate={{ x: mousePos.x - 100, y: mousePos.y - 100 }} transition={{ type: 'spring', damping: 35, stiffness: 120, mass: 0.6 }} />
       <AnimatedBackground />
       <MusicParticles color="var(--accent)" />
+
+      {/* BACKGROUND VISUALIZER */}
+      <MusicVisualizer isActive={!isPaused && songs.length > 0} tempo={120} />
+
       <PlaylistSidebar onPlaylistSelect={handlePlaylistSelect} currentPlaylist={currentSeed} isOpen={isLibraryOpen} onToggle={() => setIsLibraryOpen(!isLibraryOpen)} />
-      <CurationSidebar isOpen={isCurationOpen} onToggle={() => setIsCurationOpen(!isCurationOpen)} song={songs[0]} user={user} onActionComplete={(res) => setLastAction(res.message)} />
+      <CurationSidebar isOpen={isCurationOpen} onToggle={() => setIsCurationOpen(!isCurationOpen)} song={songs[0]} user={user} onActionComplete={(res) => setLastAction({ text: res.message, id: Date.now() })} />
       <div className="main-content">
         <header className="header">
           <div className="header-left" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -693,7 +706,19 @@ function App() {
           <div className="user-avatar">{user?.images?.[0] ? <img src={user.images[0].url} style={{ width: 32, height: 32, borderRadius: '50%' }} /> : <User size={24} />}</div>
         </header>
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} showVisuals={showVisuals} setShowVisuals={setShowVisuals} user={user} />
-        <AnimatePresence>{lastAction && (<motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="toast-notification">{lastAction}</motion.div>)}</AnimatePresence>
+        <AnimatePresence>
+          {lastAction && (
+            <motion.div
+              key={lastAction.id || 'toast'} // Forces re-render on new ID
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="toast-notification"
+            >
+              {lastAction.text || lastAction}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="main-layout">
           <div className="side-controls left">
             <div className="history-stack" style={{ marginBottom: 40, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
@@ -718,7 +743,7 @@ function App() {
             <div className="swipe-deck">
               {pulseData.active && <div className="discovery-pulse pulse-anim" style={{ '--pulse-color': pulseData.color }} />}
               <AnimatePresence mode="popLayout">
-                {songs.map((song, index) => (index <= 1 && (<SongCard key={song.id} song={song} index={index} isFront={index === 0} isActive={activeSongId === song.id} isPaused={isPaused} forcedSwipe={index === 0 ? forcedSwipe : null} onSwipe={handleSwipe} volume={isMuted ? 0 : volume} onAdd={handleAddToLibrary} theme={theme} />)))}
+                {songs.map((song, index) => (index <= 2 && (<SongCard key={song.id} song={song} index={index} isFront={index === 0} isActive={activeSongId === song.id} isPaused={isPaused} forcedSwipe={index === 0 ? forcedSwipe : null} onSwipe={handleSwipe} volume={isMuted ? 0 : volume} onAdd={handleAddToLibrary} theme={theme} />)))}
               </AnimatePresence>
             </div>
             <div className="controls">
