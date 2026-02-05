@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/VideoStreamers/SongSwipe)
+
 # 🎵 SongSwipe
 
 **The most tactile music discovery engine on the planet.**
