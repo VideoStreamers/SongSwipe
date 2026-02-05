@@ -8,11 +8,14 @@ import SettingsModal from './components/SettingsModal';
 import AnimatedBackground from './components/AnimatedBackground';
 import MusicParticles from './components/MusicParticles';
 import MusicVisualizer from './components/MusicVisualizer';
+import LandingPage from './components/LandingPage';
 import './components/AnimatedBackground.css';
 import './App.css';
 import './AppLayoutBugFix.css';
 import { redirectToAuthCodeFlow, getAccessToken } from './services/spotifyAuth';
 import * as SpotifyApi from './services/spotifyApi';
+import { DiscoveryEngine } from './services/discoveryEngine';
+import { UserFlavor } from './services/userFlavor';
 import ColorThief from 'colorthief';
 
 // ============================================================================
@@ -186,6 +189,10 @@ function App() {
   const [isMobile, setIsMobile] = useState(false);
   const volumeNotchRef = useRef(0);
 
+  // Discovery Engine refs for swipe speed tracking
+  const swipeStartTimeRef = useRef(null);
+  const currentPlaylistTracksRef = useRef([]);
+
   const triggerPulse = (direction) => {
     let color = 'var(--accent)';
     if (direction === 'left') color = '#ff5252';
@@ -287,6 +294,11 @@ function App() {
       getAccessToken(code).then(accessToken => {
         setToken(accessToken);
         SpotifyApi.setAccessToken(accessToken);
+
+        // Start a new Discovery Engine session
+        UserFlavor.startSession();
+        DiscoveryEngine.startNewSession();
+
         fetchInitialData();
       });
     }
@@ -385,128 +397,143 @@ function App() {
 
   const handlePlaylistSelect = async (playlist) => {
     setLoading(true); setSongs([]); setHistory([]); setActiveSongId(null); setIsPaused(false);
+
     try {
       let allRecs = [];
 
       if (!playlist) {
+        // "All Liked Songs" mode - use Discovery Engine for comprehensive analysis
+        setCurrentSeed({ type: 'library', name: 'My Liked Songs', id: null });
+
+        // Use the enhanced library-based recommendation
+        allRecs = await SpotifyApi.getRecommendationsFromLibrary();
+        currentPlaylistTracksRef.current = [];
+
+      } else if (playlist.id === 'top-tracks') {
+        // Top Tracks mode
         const top = await SpotifyApi.getTopTracks();
         const seedIds = top.map(t => t.id).slice(0, 5);
         setCurrentSeed({ type: 'top-tracks', name: 'My Top Tracks', id: null });
         allRecs = await SpotifyApi.getRecommendations(seedIds, [], [], 'discovery');
+        currentPlaylistTracksRef.current = top;
+
       } else {
+        // Playlist mode - use Discovery Engine for deep analysis
         const tracks = await SpotifyApi.getPlaylistTracks(playlist.id);
-        const playlistSize = tracks.length;
+        currentPlaylistTracksRef.current = tracks;
 
-        // Sample tracks from different sections
-        const sampleSize = Math.min(15, playlistSize);
-        const sampledTracks = [];
-        const sections = 3;
-        const tracksPerSection = Math.floor(sampleSize / sections);
+        // Use Discovery Engine for comprehensive playlist analysis
+        const profile = await DiscoveryEngine.analyzePlaylistVibe(tracks);
 
-        for (let section = 0; section < sections; section++) {
-          const sectionStart = Math.floor((playlistSize / sections) * section);
-          const sectionEnd = Math.floor((playlistSize / sections) * (section + 1));
-          const sectionSize = sectionEnd - sectionStart;
-
-          for (let i = 0; i < tracksPerSection; i++) {
-            const step = Math.floor(sectionSize / tracksPerSection);
-            const index = sectionStart + (i * step);
-            if (index < playlistSize) sampledTracks.push(tracks[index]);
+        if (profile) {
+          // Save genres to UserFlavor
+          if (profile.topGenres && profile.topGenres.length > 0) {
+            UserFlavor.addGenres(profile.topGenres, 2);
           }
+
+          // Get smart recommendations using the Discovery Engine
+          allRecs = await DiscoveryEngine.getSmartRecommendations({
+            playlistTracks: tracks,
+            seedTracks: profile.topArtistIds || [],
+            count: 30,
+            diversityFactor: 0.2,
+            excludeHistory: true
+          });
         }
 
-        // 1. Extract Genres (Crucial for Vibe Match)
-        const genreMap = {};
-        // Batch fetch artists for first 10 sampled tracks to minimalize API calls
-        const artistIds = [...new Set(sampledTracks.slice(0, 10).map(t => t.artists[0]?.id).filter(Boolean))];
+        // Fallback if Discovery Engine returns few results
+        if (allRecs.length < 10) {
+          console.log('[App] Discovery Engine returned few results, using fallback...');
 
-        // Fetch artist details one by one (or batch if possible, but standard endpoint is single)
-        // We'll limit to checking first 5 unique artists to save time
-        for (const artistId of artistIds.slice(0, 5)) {
-          try {
-            const artist = await SpotifyApi.getArtist(artistId);
-            if (artist.genres) {
-              artist.genres.forEach(g => genreMap[g] = (genreMap[g] || 0) + 1);
-            }
-          } catch (e) { /* silent fail */ }
-        }
+          // Sample tracks for seeds
+          const sampleSize = Math.min(15, tracks.length);
+          const sampledTracks = [];
+          const sections = 3;
+          const tracksPerSection = Math.floor(sampleSize / sections);
 
-        const topGenres = Object.entries(genreMap)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([g]) => g);
+          for (let section = 0; section < sections; section++) {
+            const sectionStart = Math.floor((tracks.length / sections) * section);
+            const sectionEnd = Math.floor((tracks.length / sections) * (section + 1));
+            const sectionSize = sectionEnd - sectionStart;
 
-        // SAVE FLAVOR: Remember these genres for the user
-        // calculated 'topGenres' are valuable info about user taste
-        import('./services/userFlavor').then(({ UserFlavor }) => {
-          UserFlavor.addGenres(topGenres);
-        });
-
-        // 2. Extract Deep Audio Features & Context
-        let targetFeatures = {};
-        try {
-          const featureTrackIds = sampledTracks.slice(0, 10).map(t => t.id);
-          const features = await SpotifyApi.getAudioFeatures(featureTrackIds).catch(() => null);
-
-          if (features && Array.isArray(features)) {
-            const valid = features.filter(Boolean);
-            if (valid.length > 0) {
-              const avg = (key) => valid.reduce((sum, f) => sum + (f[key] || 0), 0) / valid.length;
-              const avgPopularity = sampledTracks.reduce((sum, t) => sum + (t.popularity || 50), 0) / sampledTracks.length;
-
-              targetFeatures = {
-                // Core Vibe
-                target_energy: avg('energy'),
-                target_danceability: avg('danceability'),
-                target_valence: avg('valence'),
-                target_tempo: avg('tempo'),
-
-                // Advanced Texture
-                target_acousticness: avg('acousticness'),
-                target_instrumentalness: avg('instrumentalness'),
-                target_speechiness: avg('speechiness'),
-
-                // Context
-                target_popularity: Math.round(avgPopularity),
-
-                // Variance
-                min_energy: Math.max(0, avg('energy') - 0.2),
-                max_energy: Math.min(1, avg('energy') + 0.2),
-              };
+            for (let i = 0; i < tracksPerSection; i++) {
+              const step = Math.floor(sectionSize / tracksPerSection);
+              const index = sectionStart + (i * step);
+              if (index < tracks.length) sampledTracks.push(tracks[index]);
             }
           }
-        } catch (e) { console.warn("Feature extraction failed", e); }
 
-        // 3. Smart Fetch
-        // Use multiple seed combinations for diversity
-        const seedGroups = [];
-        for (let i = 0; i < sampledTracks.length; i += 5) {
-          seedGroups.push(sampledTracks.slice(i, i + 5).map(t => t.id));
+          // Extract genres
+          const genreMap = {};
+          const artistIds = [...new Set(sampledTracks.slice(0, 10).map(t => t.artists[0]?.id).filter(Boolean))];
+
+          for (const artistId of artistIds.slice(0, 5)) {
+            try {
+              const artist = await SpotifyApi.getArtist(artistId);
+              if (artist.genres) {
+                artist.genres.forEach(g => genreMap[g] = (genreMap[g] || 0) + 1);
+              }
+            } catch (e) { /* silent */ }
+          }
+
+          const topGenres = Object.entries(genreMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([g]) => g);
+
+          // Extract artist names from sampled tracks (avoids getTrack API calls)
+          const artistNames = [...new Set(sampledTracks.slice(0, 10)
+            .map(t => t.artists?.[0]?.name)
+            .filter(Boolean))];
+
+          // Get fallback recommendations using artist names instead of track IDs
+          const recPromises = [
+            SpotifyApi.getRecommendationsWithFeatures([], topGenres, {}, artistNames)
+          ];
+
+          const recResults = await Promise.all(recPromises);
+          const fallbackRecs = recResults.flat();
+
+          // Merge with existing recs, dedupe
+          const existingIds = new Set(allRecs.map(r => r.id));
+          fallbackRecs.forEach(r => {
+            if (!existingIds.has(r.id)) {
+              allRecs.push(r);
+              existingIds.add(r.id);
+            }
+          });
         }
-
-        // Call our new Smart Recommendation engine
-        const recPromises = seedGroups.map(seeds =>
-          SpotifyApi.getRecommendationsWithFeatures(seeds, topGenres, targetFeatures)
-        );
-
-        const recResults = await Promise.all(recPromises);
-        allRecs = recResults.flat();
-
-        // Deduplicate
-        const uniqueRecs = Array.from(new Map(allRecs.map(s => [s.id, s])).values());
-        allRecs = uniqueRecs.sort(() => 0.5 - Math.random());
 
         setCurrentSeed({ type: 'playlist', name: playlist.name, id: playlist.id });
       }
 
+      // Filter out any songs user has already swiped (cross-session dedup)
+      const swipedIds = new Set(UserFlavor.getAllSwipedIds());
+      allRecs = allRecs.filter(r => !swipedIds.has(r.id));
+
+      // Shuffle with controlled randomness
+      allRecs = allRecs.sort(() => Math.random() - 0.5);
+
       setSongs(allRecs);
       if (allRecs.length > 0) { updateVibe(allRecs[0]); setActiveSongId(allRecs[0].id); }
-    } catch (e) { console.error("Failed to load playlist seeds", e); }
+    } catch (e) {
+      console.error("Failed to load playlist seeds", e);
+    }
     setLoading(false);
   };
 
+  // Track when user starts interacting with a card (for swipe speed measurement)
+  const handleCardInteractionStart = () => {
+    swipeStartTimeRef.current = Date.now();
+  };
+
   const handleSwipe = async (direction, song, isForced = false) => {
-    if (isForced) { setForcedSwipe(direction); setTimeout(() => processSwipe(direction, song), 250); return; }
+    if (isForced) {
+      swipeStartTimeRef.current = Date.now(); // Set start time for forced swipes
+      setForcedSwipe(direction);
+      setTimeout(() => processSwipe(direction, song), 250);
+      return;
+    }
     processSwipe(direction, song);
   };
 
@@ -514,12 +541,27 @@ function App() {
     setForcedSwipe(null); setIsPaused(false);
     playUISound(direction === 'right' || direction === 'up' ? 'swipe-right' : 'swipe-left');
 
-    // RECORD FLAVOR
-    import('./services/userFlavor').then(({ UserFlavor }) => {
-      if (direction === 'right' || direction === 'up') UserFlavor.recordLike(song);
-      else if (direction === 'left') UserFlavor.recordDislike(song);
-    });
+    // Calculate swipe speed for confidence tracking
+    const swipeSpeed = swipeStartTimeRef.current ? (Date.now() - swipeStartTimeRef.current) : null;
+    swipeStartTimeRef.current = null;
 
+    // RECORD TO DISCOVERY ENGINE (comprehensive behavioral tracking)
+    try {
+      await DiscoveryEngine.recordSwipe(song, direction, swipeSpeed ? Date.now() - swipeSpeed : null);
+    } catch (e) { console.warn('[App] Discovery Engine recording failed', e); }
+
+    // RECORD TO USER FLAVOR (legacy + enhanced tracking)
+    try {
+      if (direction === 'up') {
+        UserFlavor.recordSuperLike(song, { swipeSpeed });
+      } else if (direction === 'right') {
+        UserFlavor.recordLike(song, { swipeSpeed });
+      } else if (direction === 'left') {
+        UserFlavor.recordDislike(song, { swipeSpeed });
+      }
+    } catch (e) { console.warn('[App] UserFlavor recording failed', e); }
+
+    // Spotify actions
     if (direction === 'right') {
       if (currentSeed.id) {
         SpotifyApi.addToPlaylist(currentSeed.id, song.uri).catch(e => console.error("Add failed", e));
@@ -530,24 +572,59 @@ function App() {
     } else if (direction === 'up') {
       SpotifyApi.saveTrack(song.id).catch(e => console.error("Superlike failed", e));
       setLastAction({ text: 'Super Like!', id: Date.now() });
+    } else {
+      // Left swipe - no toast but still tracked
     }
 
     // Clear action after delay
     setTimeout(() => setLastAction(null), 2000);
-    setHistory(prev => [...prev, song]); const newSongs = songs.slice(1); setSongs(newSongs);
-    if (newSongs.length > 0) { updateVibe(newSongs[0]); setActiveSongId(newSongs[0].id); triggerPulse(direction); }
+    setHistory(prev => [...prev, song]);
+    const newSongs = songs.slice(1);
+    setSongs(newSongs);
+
+    if (newSongs.length > 0) {
+      updateVibe(newSongs[0]);
+      setActiveSongId(newSongs[0].id);
+      triggerPulse(direction);
+    }
+
+    // Refill queue when running low
     if (newSongs.length < 3) {
-      const more = await SpotifyApi.getRecommendations([song.id], [], [], 'discovery');
+      try {
+        // Use Discovery Engine for smarter refills
+        const more = await DiscoveryEngine.getSmartRecommendations({
+          playlistTracks: currentPlaylistTracksRef.current,
+          seedTracks: [song.id],
+          count: 20,
+          diversityFactor: 0.3,
+          excludeHistory: true
+        });
 
-      // Filter out duplicates from both current queue AND history
-      const seenIds = new Set([
-        ...newSongs.map(x => x.id),
-        ...history.map(x => x.id),
-        song.id // Also exclude the song we just swiped
-      ]);
+        // Additional filtering against current queue and session history
+        const seenIds = new Set([
+          ...newSongs.map(x => x.id),
+          ...history.map(x => x.id),
+          song.id,
+          ...UserFlavor.getAllSwipedIds()
+        ]);
 
-      const fresh = more.filter(s => !seenIds.has(s.id));
-      setSongs([...newSongs, ...fresh]);
+        const fresh = more.filter(s => !seenIds.has(s.id));
+
+        if (fresh.length > 0) {
+          setSongs(prev => [...prev, ...fresh]);
+        } else {
+          // Fallback to basic recommendations if Discovery Engine returns nothing new
+          const fallbackRecs = await SpotifyApi.getRecommendations([song.id], [], [], 'discovery');
+          const fallbackFresh = fallbackRecs.filter(s => !seenIds.has(s.id));
+          setSongs(prev => [...prev, ...fallbackFresh]);
+        }
+      } catch (e) {
+        console.warn('[App] Queue refill failed', e);
+        // Silent fallback
+        const fallback = await SpotifyApi.getRecommendations([song.id], [], [], 'discovery');
+        const seenIds = new Set([...newSongs.map(x => x.id), ...history.map(x => x.id), song.id]);
+        setSongs(prev => [...prev, ...fallback.filter(s => !seenIds.has(s.id))]);
+      }
     }
   };
 
@@ -562,145 +639,8 @@ function App() {
 
   if (!token) {
     return (
-      <div className="snap-container">
-        <motion.div
-          className="liquid-cursor"
-          style={{
-            x: mouseX,
-            y: mouseY,
-            background: `radial-gradient(circle, var(--accent) 0%, transparent 60%)`,
-            mixBlendMode: 'screen',
-            filter: 'blur(24px) brightness(1.3)'
-          }}
-        />
-        {!isMobile && <AnimatedBackground />}
-
-        {/* MOBILE LANDING PAGE */}
-        {isMobile && (
-          <section className="snap-section hero-snap">
-            <div className="mobile-landing">
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 3 }}
-              >
-                <Music size={60} color="var(--accent)" />
-              </motion.div>
-              <h1 className="mobile-title">SongSwipe</h1>
-              <p className="mobile-subtitle">Tactile music discovery</p>
-              <button className="login-btn mobile-login" onClick={redirectToAuthCodeFlow}>ENTER</button>
-              <div className="mobile-credits">
-                <span>Created by <strong>Seppe Dorissen</strong></span>
-                <span className="ai-note" style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: 4 }}>Experimental AI Concept Build</span>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* DESKTOP LANDING PAGE */}
-        {!isMobile && (
-          <>
-            <section className="snap-section hero-snap">
-              <PerspectiveCard className="demo-window">
-                <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ repeat: Infinity, duration: 5 }}><Music size={80} color="var(--accent)" /></motion.div>
-                <h1 className="main-title">SongSwipe</h1>
-                <p className="login-subtitle">The most tactile music discovery engine on the planet.</p>
-                <button className="login-btn" onClick={redirectToAuthCodeFlow} style={{ padding: '30px 80px', fontSize: '2rem' }}>ENTER THE FLOW</button>
-                <div className="scroll-indicator">Explore Innovation <ChevronDown size={24} style={{ display: 'block', margin: '10px auto' }} /></div>
-                <div className="credits-footer" style={{ position: 'absolute', bottom: -120, left: 0, width: '100%', textAlign: 'center' }}>
-                  Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
-                  <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
-                </div>
-              </PerspectiveCard>
-            </section>
-
-            <section className="snap-section feature-snap">
-              <h2 className="vibe-text" style={{ top: '15%' }}>DYNAMICS.</h2>
-              <div className="vibe-card-grid">
-                <PerspectiveCard className="gimmick-card">
-                  <Zap size={64} color="var(--accent)" />
-                  <h3>TACTILE PHYSICS</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Icons you can touch and toss.</p>
-                  <PhysicsBox />
-                </PerspectiveCard>
-                <PerspectiveCard className="gimmick-card">
-                  <Star size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
-                  <h3>CHROMATIC FLOW</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Extracting the soul of every pixel.</p>
-                  <ColorMixer />
-                </PerspectiveCard>
-                <PerspectiveCard className="gimmick-card">
-                  <Sparkles size={64} color="var(--mood-chill)" style={{ color: 'var(--mood-chill)' }} />
-                  <h3>ULTRA FLUID</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 12, marginBottom: 20 }}>Physics-based UI for music lovers.</p>
-                  <GravityTiles />
-                </PerspectiveCard>
-              </div>
-            </section>
-
-            <section className="snap-section feature-snap" style={{ background: 'rgba(0,0,0,0.2)' }}>
-              <h2 className="vibe-text" style={{ top: '15%', opacity: 0.1 }}>SENSORY.</h2>
-              <div className="vibe-card-grid">
-                <PerspectiveCard className="gimmick-card">
-                  <Music size={64} color="var(--accent)" />
-                  <h3>SONIC SCANNER</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Real-time playback visualization.</p>
-                  <FrequencyScanner />
-                </PerspectiveCard>
-                <PerspectiveCard className="gimmick-card">
-                  <Globe size={64} color="var(--accent)" />
-                  <h3>GLOBAL SYNC</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>Synchronized with the world's library.</p>
-                  <div style={{ position: 'relative', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <VibePulse />
-                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}>
-                      <Globe size={80} style={{ opacity: 0.2 }} />
-                    </motion.div>
-                  </div>
-                </PerspectiveCard>
-                <PerspectiveCard className="gimmick-card">
-                  <Cpu size={64} color="var(--mood-hype)" />
-                  <h3>NEURAL MATCH</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: '12px 0 20px' }}>AI-driven discovery engine.</p>
-                  <div style={{ padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '15px' }}>
-                    {[1, 2, 3].map(i => (
-                      <motion.div
-                        key={i}
-                        initial={{ width: '0%' }}
-                        animate={{ width: ['20%', '100%', '20%'] }}
-                        transition={{ repeat: Infinity, duration: 4, delay: i * 0.5 }}
-                        style={{ height: '6px', background: 'var(--accent)', borderRadius: '3px', marginBottom: '10px', opacity: 0.3 }}
-                      />
-                    ))}
-                  </div>
-                </PerspectiveCard>
-              </div>
-            </section>
-
-            <section className="snap-section hero-snap" style={{ background: 'var(--bg-primary)' }}>
-              <h2 className="vibe-text" style={{ bottom: '20%', opacity: 0.05 }}>INTELLIGENCE.</h2>
-              <div className="vibe-card-grid">
-                <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
-                  <Globe size={64} color="var(--accent)" />
-                  <h3>GLOBAL DISCOVERY</h3>
-                  <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Hook into the world's largest music library with high-performance recommendation logic.</p>
-                  <motion.div style={{ marginTop: 20, height: '4px', background: 'var(--accent)', width: '0%' }} animate={{ width: '100%' }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }} />
-                </PerspectiveCard>
-                <PerspectiveCard className="gimmick-card" style={{ width: '400px' }}>
-                  <Cpu size={64} color="var(--mood-hype)" style={{ color: 'var(--mood-hype)' }} />
-                  <h3>MOOD-BASED AI</h3>
-                  <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: 16 }}>Our Hype/Chill filters actively analyze temporal data for biological matching.</p>
-                  <div style={{ marginTop: 20, display: 'flex', gap: 5, alignItems: 'flex-end', height: 40, justifyContent: 'center' }}>
-                    {[1, 2, 3, 4, 5].map(i => <motion.div key={i} animate={{ height: [10, 30, 10] }} transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }} style={{ width: 6, background: 'var(--accent)', borderRadius: 3 }} />)}
-                  </div>
-                </PerspectiveCard>
-              </div>
-              <div className="credits-footer" style={{ position: 'absolute', bottom: 40, width: '100%', textAlign: 'center' }}>
-                Created by <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 900 }}>Seppe Dorissen</a>
-                <span className="ai-note" style={{ display: 'block', fontSize: '0.7rem', opacity: 0.5, marginTop: 8 }}>Experimental AI Concept Build</span>
-              </div>
-            </section>
-          </>
-        )}
+      <div className={`app-container ${theme}-theme`}>
+        <LandingPage onLogin={redirectToAuthCodeFlow} isMobile={isMobile} />
       </div>
     );
   }
@@ -782,7 +722,7 @@ function App() {
             <div className="swipe-deck">
               {pulseData.active && <div className="discovery-pulse pulse-anim" style={{ '--pulse-color': pulseData.color }} />}
               <AnimatePresence mode="popLayout">
-                {songs.map((song, index) => (index <= 2 && (<SongCard key={song.id} song={song} index={index} isFront={index === 0} isActive={activeSongId === song.id} isPaused={isPaused} forcedSwipe={index === 0 ? forcedSwipe : null} onSwipe={handleSwipe} volume={isMuted ? 0 : volume} onAdd={handleAddToLibrary} theme={theme} />)))}
+                {songs.map((song, index) => (index <= 2 && (<SongCard key={song.id} song={song} index={index} isFront={index === 0} isActive={activeSongId === song.id} isPaused={isPaused} forcedSwipe={index === 0 ? forcedSwipe : null} onSwipe={handleSwipe} volume={isMuted ? 0 : volume} onAdd={handleAddToLibrary} theme={theme} onInteractionStart={handleCardInteractionStart} />)))}
               </AnimatePresence>
             </div>
             <div className="controls">

@@ -3,13 +3,20 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Music2, Play, Pause, Plus, Volume2, VolumeX, BarChart, Calendar, Zap, Info } from 'lucide-react';
 import './SongCard.css';
 
-const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwipe, volume = 1, theme = 'dark', onAdd }) => {
+const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwipe, volume = 1, theme = 'dark', onAdd, onInteractionStart }) => {
     // Motion Values
     const x = useMotionValue(0);
     const y = useMotionValue(0);
 
     const [activePreviewUrl, setActivePreviewUrl] = useState(song?.preview_url || null);
     const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+
+    // Track when user starts interacting for swipe speed measurement
+    const handleDragStart = useCallback(() => {
+        if (onInteractionStart) {
+            onInteractionStart();
+        }
+    }, [onInteractionStart]);
 
     // FETCH FALLBACK AUDIO (iTunes) if missing
     useEffect(() => {
@@ -142,6 +149,7 @@ const SongCard = ({ song, onSwipe, index, isFront, isActive, isPaused, forcedSwi
             dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
             dragElastic={0.7}
             dragTransition={{ bounceStiffness: 500, bounceDamping: 20 }}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             initial={{ scale: 0.95, y: 30, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
