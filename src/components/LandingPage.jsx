@@ -1346,6 +1346,27 @@ const LandingPage = ({ onLogin, isMobile }) => {
                             </motion.button>
                         </div>
                     </motion.div>
+
+                    {!isMobile && (
+                        <div className="landing-footer-content">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                viewport={{ once: true }}
+                            >
+                                <p>
+                                    Created by{' '}
+                                    <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
+                                        Seppe Dorissen
+                                    </a>
+                                </p>
+                                <span className="ai-badge">
+                                    <Cpu size={14} />
+                                    Experimental AI Build
+                                </span>
+                            </motion.div>
+                        </div>
+                    )}
                 </section>
 
                 {/* ===== MOBILE CTA SECTION ===== */}
@@ -1369,28 +1390,30 @@ const LandingPage = ({ onLogin, isMobile }) => {
                                 <span>Start Now</span>
                             </motion.button>
                         </motion.div>
+
+                        <div className="landing-footer-content">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                viewport={{ once: true }}
+                            >
+                                <p>
+                                    Created by{' '}
+                                    <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
+                                        Seppe Dorissen
+                                    </a>
+                                </p>
+                                <span className="ai-badge">
+                                    <Cpu size={14} />
+                                    Experimental AI Build
+                                </span>
+                            </motion.div>
+                        </div>
                     </section>
                 )}
 
                 {/* ===== FOOTER ===== */}
-                <footer className="landing-footer">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                    >
-                        <p>
-                            Created by{' '}
-                            <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
-                                Seppe Dorissen
-                            </a>
-                        </p>
-                        <span className="ai-badge">
-                            <Cpu size={14} />
-                            Experimental AI Build
-                        </span>
-                    </motion.div>
-                </footer>
+
             </div>
         </>
     );
