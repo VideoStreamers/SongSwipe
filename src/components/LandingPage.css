@@ -1147,3 +1147,418 @@ html {
 .light-theme .audio-toggle {
     background: rgba(255, 255, 255, 0.8);
 }
+
+/* ============================================================================
+   WELCOME UNLOCK OVERLAY
+   ============================================================================ */
+
+.welcome-unlock-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+/* Background Orbs */
+.unlock-bg-orbs {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.unlock-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.6;
+}
+
+.unlock-orb-1 {
+    width: 500px;
+    height: 500px;
+    left: 10%;
+    top: 20%;
+    background: radial-gradient(circle, rgba(29, 185, 84, 0.5) 0%, transparent 70%);
+}
+
+.unlock-orb-2 {
+    width: 400px;
+    height: 400px;
+    right: 15%;
+    top: 50%;
+    background: radial-gradient(circle, rgba(138, 43, 226, 0.4) 0%, transparent 70%);
+}
+
+.unlock-orb-3 {
+    width: 450px;
+    height: 450px;
+    left: 50%;
+    bottom: 10%;
+    background: radial-gradient(circle, rgba(0, 210, 255, 0.35) 0%, transparent 70%);
+}
+
+/* Floating particles */
+.unlock-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.unlock-particle {
+    position: absolute;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0.5;
+    filter: blur(1px);
+}
+
+/* Main content container */
+.unlock-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 32px;
+    max-width: 600px;
+    padding: 40px;
+}
+
+/* Top tagline */
+.unlock-tagline {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent);
+    opacity: 0.8;
+}
+
+.unlock-tagline-line {
+    width: 40px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent));
+}
+
+.unlock-tagline-line:last-child {
+    background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+/* Button container */
+.unlock-button-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 200px;
+}
+
+/* Pulse rings */
+.unlock-pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    pointer-events: none;
+}
+
+/* Main unlock button */
+.unlock-button {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(145deg,
+            rgba(29, 185, 84, 0.2) 0%,
+            rgba(29, 185, 84, 0.1) 50%,
+            rgba(29, 185, 84, 0.05) 100%);
+    backdrop-filter: blur(20px);
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 2px solid rgba(29, 185, 84, 0.3);
+    box-shadow:
+        0 0 60px rgba(29, 185, 84, 0.3),
+        inset 0 0 30px rgba(29, 185, 84, 0.1);
+}
+
+.unlock-button:hover {
+    background: linear-gradient(145deg,
+            rgba(29, 185, 84, 0.3) 0%,
+            rgba(29, 185, 84, 0.2) 50%,
+            rgba(29, 185, 84, 0.1) 100%);
+    border-color: rgba(29, 185, 84, 0.6);
+    box-shadow:
+        0 0 80px rgba(29, 185, 84, 0.5),
+        0 0 120px rgba(29, 185, 84, 0.3),
+        inset 0 0 40px rgba(29, 185, 84, 0.2);
+}
+
+.unlock-button.unlocking {
+    pointer-events: none;
+}
+
+.unlock-button-glow {
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle, rgba(29, 185, 84, 0.4) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.unlock-button:hover .unlock-button-glow {
+    opacity: 1;
+}
+
+.unlock-button-inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    gap: 12px;
+}
+
+.unlock-icon {
+    color: var(--accent);
+    filter: drop-shadow(0 0 15px rgba(29, 185, 84, 0.5));
+}
+
+.unlock-button-bars {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 24px;
+}
+
+.unlock-bar {
+    width: 4px;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transform-origin: center;
+}
+
+/* Title */
+.unlock-title {
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-weight: 950;
+    letter-spacing: -3px;
+    line-height: 1.1;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.unlock-title-accent {
+    background: linear-gradient(135deg,
+            var(--accent) 0%,
+            #00d2ff 40%,
+            var(--mood-hype) 70%,
+            var(--accent) 100%);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: unlock-gradient-shift 4s ease infinite;
+}
+
+@keyframes unlock-gradient-shift {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Subtitle */
+.unlock-subtitle {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 400px;
+    line-height: 1.5;
+}
+
+/* Soundwave */
+.unlock-soundwave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 20px 40px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.unlock-soundwave-bar {
+    width: 5px;
+    min-height: 8px;
+    background: linear-gradient(180deg, var(--accent), rgba(29, 185, 84, 0.3));
+    border-radius: 4px;
+}
+
+/* Hint */
+.unlock-hint {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Locked state for main page */
+.landing-page.locked {
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ============================================================================
+   WELCOME UNLOCK - MOBILE RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .unlock-content {
+        padding: 24px;
+        gap: 24px;
+    }
+
+    .unlock-tagline {
+        font-size: 0.75rem;
+        letter-spacing: 3px;
+    }
+
+    .unlock-tagline-line {
+        width: 24px;
+    }
+
+    .unlock-button-container {
+        width: 160px;
+        height: 160px;
+    }
+
+    .unlock-button {
+        width: 130px;
+        height: 130px;
+    }
+
+    .unlock-icon svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .unlock-button-bars {
+        gap: 3px;
+        height: 18px;
+    }
+
+    .unlock-bar {
+        width: 3px;
+    }
+
+    .unlock-title {
+        letter-spacing: -2px;
+    }
+
+    .unlock-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .unlock-soundwave {
+        padding: 14px 24px;
+        gap: 3px;
+    }
+
+    .unlock-soundwave-bar {
+        width: 4px;
+    }
+
+    .unlock-hint {
+        font-size: 0.8rem;
+    }
+
+    .unlock-orb-1,
+    .unlock-orb-2,
+    .unlock-orb-3 {
+        filter: blur(60px);
+        opacity: 0.4;
+    }
+
+    .unlock-orb-1 {
+        width: 300px;
+        height: 300px;
+    }
+
+    .unlock-orb-2 {
+        width: 250px;
+        height: 250px;
+    }
+
+    .unlock-orb-3 {
+        width: 280px;
+        height: 280px;
+    }
+}
+
+/* ============================================================================
+   WELCOME UNLOCK - LIGHT THEME
+   ============================================================================ */
+
+.light-theme .welcome-unlock-overlay {
+    background: var(--bg-primary);
+}
+
+.light-theme .unlock-orb-1 {
+    background: radial-gradient(circle, rgba(29, 185, 84, 0.25) 0%, transparent 70%);
+}
+
+.light-theme .unlock-orb-2 {
+    background: radial-gradient(circle, rgba(138, 43, 226, 0.2) 0%, transparent 70%);
+}
+
+.light-theme .unlock-orb-3 {
+    background: radial-gradient(circle, rgba(0, 210, 255, 0.2) 0%, transparent 70%);
+}
+
+.light-theme .unlock-button {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(29, 185, 84, 0.4);
+    box-shadow:
+        0 20px 40px rgba(29, 185, 84, 0.15),
+        inset 0 0 20px rgba(29, 185, 84, 0.1);
+}
+
+.light-theme .unlock-button:hover {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow:
+        0 30px 60px rgba(29, 185, 84, 0.25),
+        inset 0 0 30px rgba(29, 185, 84, 0.15);
+}
+
+.light-theme .unlock-soundwave {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.light-theme .unlock-particle {
+    opacity: 0.3;
+}

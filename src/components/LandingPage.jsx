@@ -1,187 +1,134 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { Music, Sparkles, Zap, Heart, X, ChevronDown, Globe, Cpu, Headphones, Play, ArrowRight, Volume2, VolumeX, MousePointer, Smartphone, ListMusic, Disc3, Radio, Waves } from 'lucide-react';
+import { Music, Sparkles, Zap, Heart, X, ChevronDown, Globe, Cpu, Headphones, Play, ArrowRight, Volume2, VolumeX, MousePointer, Smartphone, ListMusic, Disc3, Radio, Waves, Disc, Headphones as HeadphonesIcon } from 'lucide-react';
 import './LandingPage.css';
 
 // ============================================================================
-// SPOTIFY-STYLE MINIMALIST AUDIO ENGINE
-// Clean, crisp UI sounds with musical "stamps" for section transitions
+// SECTION MUSIC ENGINE - Real background music per section
 // ============================================================================
 
-// Musical stamps for each section (short 2-3 note motifs)
-const SECTION_STAMPS = {
-    0: { notes: [523.25, 659.25], name: 'hero' },           // C5, E5 - bright intro
-    1: { notes: [392, 493.88, 587.33], name: 'howItWorks' }, // G4, B4, D5 - curious rising
-    2: { notes: [440, 554.37], name: 'demo' },               // A4, C#5 - energetic
-    3: { notes: [349.23, 440, 523.25], name: 'genres' },     // F4, A4, C5 - colorful
-    4: { notes: [329.63, 415.30, 523.25], name: 'features' }, // E4, G#4, C5 - confident
-    5: { notes: [523.25, 659.25, 783.99], name: 'cta' }      // C5, E5, G5 - triumphant major
+// Section to audio file mapping
+const SECTION_AUDIO = {
+    0: 'audio/sections/hero.mp3',
+    1: 'audio/sections/how-it-works.mp3',
+    2: 'audio/sections/demo.mp3',
+    3: null, // Genres section uses genre previews instead
+    4: 'audio/sections/features.mp3',
+    5: 'audio/sections/cta.mp3'
 };
 
 class SectionAudioEngine {
     constructor() {
-        this.ctx = null;
-        this.masterGain = null;
+        this.currentAudio = null;
+        this.nextAudio = null;
         this.currentSection = -1;
         this.isEnabled = false;
-        this.hasInteracted = false;
-    }
-
-    init() {
-        if (this.ctx) return true;
-        try {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            this.masterGain = this.ctx.createGain();
-            this.masterGain.gain.value = 0;
-            this.masterGain.connect(this.ctx.destination);
-            return true;
-        } catch (e) {
-            console.warn('Audio not supported');
-            return false;
-        }
+        this.volume = 0.3;
+        this.fadeInterval = null;
     }
 
     async enable() {
-        if (!this.init()) return;
-        if (this.ctx.state === 'suspended') {
-            await this.ctx.resume();
-        }
         this.isEnabled = true;
-        this.hasInteracted = true;
-        this.masterGain.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.2);
+        // Start playing current section if we have one
+        if (this.currentSection >= 0) {
+            this.crossfadeToSection(this.currentSection);
+        }
     }
 
     disable() {
-        if (!this.ctx) return;
         this.isEnabled = false;
-        this.masterGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
-    }
-
-    // Clean pop sound for clicks
-    playClick() {
-        if (!this.init() || !this.isEnabled) return;
-        const now = this.ctx.currentTime;
-
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        const filter = this.ctx.createBiquadFilter();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, now);
-        osc.frequency.exponentialRampToValueAtTime(600, now + 0.06);
-
-        filter.type = 'lowpass';
-        filter.frequency.value = 2000;
-
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain);
-
-        osc.start(now);
-        osc.stop(now + 0.08);
-    }
-
-    // Soft tick for hover
-    playHover() {
-        if (!this.init() || !this.isEnabled) return;
-        const now = this.ctx.currentTime;
-
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.value = 2400;
-
-        gain.gain.setValueAtTime(0.03, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
-
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-
-        osc.start(now);
-        osc.stop(now + 0.025);
-    }
-
-    // Pleasant swipe sounds
-    playSwipe(direction) {
-        if (!this.init() || !this.isEnabled) return;
-        const now = this.ctx.currentTime;
-
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        const filter = this.ctx.createBiquadFilter();
-
-        filter.type = 'lowpass';
-        filter.frequency.value = 3000;
-        filter.Q.value = 1;
-
-        if (direction === 'right') {
-            // Like: bright, happy ascending
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(440, now);
-            osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-            gain.gain.setValueAtTime(0.12, now);
-        } else {
-            // Nope: softer descending
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(600, now);
-            osc.frequency.exponentialRampToValueAtTime(200, now + 0.12);
-            gain.gain.setValueAtTime(0.08, now);
+        if (this.currentAudio) {
+            this.fadeOut(this.currentAudio, () => {
+                this.currentAudio?.pause();
+                this.currentAudio = null;
+            });
         }
-
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain);
-
-        osc.start(now);
-        osc.stop(now + 0.12);
     }
 
-    // Musical stamp for section transitions (2-3 note motif)
-    playSectionTransition() {
-        // Handled by crossfadeToSection
+    fadeIn(audio, targetVolume = this.volume) {
+        if (!audio) return;
+        audio.volume = 0;
+        let vol = 0;
+        const fade = () => {
+            vol += 0.02;
+            if (vol < targetVolume) {
+                audio.volume = vol;
+                requestAnimationFrame(fade);
+            } else {
+                audio.volume = targetVolume;
+            }
+        };
+        requestAnimationFrame(fade);
+    }
+
+    fadeOut(audio, onComplete) {
+        if (!audio) {
+            onComplete?.();
+            return;
+        }
+        let vol = audio.volume;
+        const fade = () => {
+            vol -= 0.02;
+            if (vol > 0) {
+                audio.volume = vol;
+                requestAnimationFrame(fade);
+            } else {
+                audio.volume = 0;
+                onComplete?.();
+            }
+        };
+        requestAnimationFrame(fade);
     }
 
     crossfadeToSection(sectionIndex) {
-        if (!this.isEnabled || !this.ctx || sectionIndex === this.currentSection) return;
+        if (!this.isEnabled) {
+            this.currentSection = sectionIndex;
+            return;
+        }
 
-        const stamp = SECTION_STAMPS[sectionIndex] || SECTION_STAMPS[0];
-        const now = this.ctx.currentTime;
+        if (sectionIndex === this.currentSection) return;
 
-        // Play musical stamp (quick ascending notes)
-        stamp.notes.forEach((freq, i) => {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            const filter = this.ctx.createBiquadFilter();
-
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-
-            filter.type = 'lowpass';
-            filter.frequency.value = 4000;
-
-            const noteStart = now + (i * 0.06);
-            const noteDuration = 0.15;
-
-            gain.gain.setValueAtTime(0, noteStart);
-            gain.gain.linearRampToValueAtTime(0.08, noteStart + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, noteStart + noteDuration);
-
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(this.masterGain);
-
-            osc.start(noteStart);
-            osc.stop(noteStart + noteDuration);
-        });
-
+        const audioPath = SECTION_AUDIO[sectionIndex];
         this.currentSection = sectionIndex;
+
+        // If no audio for this section (like genres), fade out current
+        if (!audioPath) {
+            if (this.currentAudio) {
+                this.fadeOut(this.currentAudio, () => {
+                    this.currentAudio?.pause();
+                    this.currentAudio = null;
+                });
+            }
+            return;
+        }
+
+        // Create new audio
+        const newAudio = new Audio(audioPath);
+        newAudio.loop = true;
+        newAudio.volume = 0;
+
+        // Fade out old, fade in new
+        if (this.currentAudio) {
+            const oldAudio = this.currentAudio;
+            this.fadeOut(oldAudio, () => {
+                oldAudio.pause();
+            });
+        }
+
+        this.currentAudio = newAudio;
+
+        newAudio.play().then(() => {
+            this.fadeIn(newAudio);
+        }).catch(e => {
+            console.log('Section music play failed:', e);
+        });
     }
+
+    // Stub methods - these are no-ops now since we removed synthetic sounds
+    playClick() { }
+    playHover() { }
+    playSectionTransition() { }
+    playSwipe(direction) { }
 }
 
 const audioEngine = new SectionAudioEngine();
@@ -668,6 +615,244 @@ const SoundWave = () => (
 );
 
 // ============================================================================
+// WELCOME UNLOCK OVERLAY - Interactive entry point for audio permissions
+// ============================================================================
+
+const WelcomeUnlock = ({ onUnlock }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [isUnlocking, setIsUnlocking] = useState(false);
+
+    // Generate random bars for the soundwave animation
+    const bars = useMemo(() =>
+        [...Array(24)].map((_, i) => ({
+            height: 20 + Math.random() * 60,
+            delay: i * 0.05,
+            duration: 0.8 + Math.random() * 0.6
+        })),
+        []);
+
+    const handleUnlock = async () => {
+        setIsUnlocking(true);
+        // Dramatic unlock animation before revealing
+        await new Promise(r => setTimeout(r, 800));
+        onUnlock();
+    };
+
+    return (
+        <motion.div
+            className="welcome-unlock-overlay"
+            initial={{ opacity: 1 }}
+            exit={{
+                opacity: 0,
+                scale: 1.1,
+                filter: 'blur(20px)'
+            }}
+            transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+        >
+            {/* Animated background orbs */}
+            <div className="unlock-bg-orbs">
+                <motion.div
+                    className="unlock-orb unlock-orb-1"
+                    animate={{
+                        x: [0, 100, -50, 0],
+                        y: [0, -80, 40, 0],
+                        scale: [1, 1.2, 0.9, 1]
+                    }}
+                    transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <motion.div
+                    className="unlock-orb unlock-orb-2"
+                    animate={{
+                        x: [0, -80, 60, 0],
+                        y: [0, 60, -100, 0],
+                        scale: [1, 0.8, 1.3, 1]
+                    }}
+                    transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <motion.div
+                    className="unlock-orb unlock-orb-3"
+                    animate={{
+                        x: [0, 50, -100, 0],
+                        y: [0, -60, 80, 0],
+                        scale: [1, 1.4, 0.7, 1]
+                    }}
+                    transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+                />
+            </div>
+
+            {/* Floating particles */}
+            <div className="unlock-particles">
+                {[...Array(20)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="unlock-particle"
+                        style={{
+                            left: `${5 + Math.random() * 90}%`,
+                            top: `${5 + Math.random() * 90}%`,
+                            width: 4 + Math.random() * 8,
+                            height: 4 + Math.random() * 8,
+                        }}
+                        animate={{
+                            y: [0, -30, 0],
+                            opacity: [0.3, 0.8, 0.3],
+                            scale: [1, 1.5, 1]
+                        }}
+                        transition={{
+                            duration: 3 + Math.random() * 4,
+                            repeat: Infinity,
+                            delay: Math.random() * 2,
+                            ease: 'easeInOut'
+                        }}
+                    />
+                ))}
+            </div>
+
+            <div className="unlock-content">
+                {/* Top tagline */}
+                <motion.div
+                    className="unlock-tagline"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.8 }}
+                >
+                    <span className="unlock-tagline-line"></span>
+                    <span>SongSwipe</span>
+                    <span className="unlock-tagline-line"></span>
+                </motion.div>
+
+                {/* Central unlock button with animations */}
+                <motion.div
+                    className="unlock-button-container"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5, duration: 0.8, type: 'spring' }}
+                >
+                    {/* Outer pulse rings */}
+                    <motion.div
+                        className="unlock-pulse-ring unlock-pulse-1"
+                        animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                    />
+                    <motion.div
+                        className="unlock-pulse-ring unlock-pulse-2"
+                        animate={{ scale: [1, 2.5], opacity: [0.4, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
+                    />
+                    <motion.div
+                        className="unlock-pulse-ring unlock-pulse-3"
+                        animate={{ scale: [1, 2.5], opacity: [0.2, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeOut', delay: 1 }}
+                    />
+
+                    {/* The main button */}
+                    <motion.button
+                        className={`unlock-button ${isUnlocking ? 'unlocking' : ''}`}
+                        onClick={handleUnlock}
+                        onHoverStart={() => setIsHovered(true)}
+                        onHoverEnd={() => setIsHovered(false)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        animate={isUnlocking ? {
+                            scale: [1, 1.2, 0],
+                            rotate: [0, 180, 360],
+                            opacity: [1, 1, 0]
+                        } : {}}
+                        transition={isUnlocking ? { duration: 0.8 } : {}}
+                    >
+                        <div className="unlock-button-glow"></div>
+                        <div className="unlock-button-inner">
+                            <motion.div
+                                className="unlock-icon"
+                                animate={isHovered ? { rotate: 360 } : { rotate: 0 }}
+                                transition={{ duration: 0.6 }}
+                            >
+                                <Headphones size={48} />
+                            </motion.div>
+                            <div className="unlock-button-bars">
+                                {[...Array(5)].map((_, i) => (
+                                    <motion.div
+                                        key={i}
+                                        className="unlock-bar"
+                                        animate={{
+                                            scaleY: [0.3, 1, 0.3],
+                                        }}
+                                        transition={{
+                                            duration: 0.6,
+                                            repeat: Infinity,
+                                            delay: i * 0.1,
+                                            ease: 'easeInOut'
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </motion.button>
+                </motion.div>
+
+                {/* Main heading */}
+                <motion.h1
+                    className="unlock-title"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7, duration: 0.8 }}
+                >
+                    Discover New <span className="unlock-title-accent">Music</span>
+                </motion.h1>
+
+                {/* Subtitle */}
+                <motion.p
+                    className="unlock-subtitle"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.9, duration: 0.8 }}
+                >
+                    Click to unlock sound and enter the experience
+                </motion.p>
+
+                {/* Animated soundwave at the bottom */}
+                <motion.div
+                    className="unlock-soundwave"
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    transition={{ delay: 1.1, duration: 0.8 }}
+                >
+                    {bars.map((bar, i) => (
+                        <motion.div
+                            key={i}
+                            className="unlock-soundwave-bar"
+                            animate={{
+                                height: [10, bar.height, 10],
+                            }}
+                            transition={{
+                                duration: bar.duration,
+                                repeat: Infinity,
+                                delay: bar.delay,
+                                ease: 'easeInOut'
+                            }}
+                        />
+                    ))}
+                </motion.div>
+
+                {/* Bottom hint */}
+                <motion.div
+                    className="unlock-hint"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.3, duration: 0.8 }}
+                >
+                    <motion.span
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                    >
+                        🎵 Tap anywhere on the button to begin 🎵
+                    </motion.span>
+                </motion.div>
+            </div>
+        </motion.div>
+    );
+};
+
+// ============================================================================
 // MAIN LANDING PAGE COMPONENT
 // ============================================================================
 
@@ -678,8 +863,20 @@ const LandingPage = ({ onLogin, isMobile }) => {
     const [showBackToTop, setShowBackToTop] = useState(false);
     const [activeSection, setActiveSection] = useState(0);
     const [hasInteracted, setHasInteracted] = useState(false);
+    const [isUnlocked, setIsUnlocked] = useState(false); // New: Track if user has unlocked
     const containerRef = useRef(null);
     const lastSectionRef = useRef(0);
+
+    // Handle welcome screen unlock
+    const handleUnlock = async () => {
+        setIsUnlocked(true);
+        setHasInteracted(true);
+        if (audioEnabled) {
+            await audioEngine.enable();
+            await genrePreviewManager.enable();
+            audioEngine.crossfadeToSection(0); // Start with hero vibe
+        }
+    };
 
     // Auto-enable audio on first user interaction
     useEffect(() => {
@@ -791,221 +988,183 @@ const LandingPage = ({ onLogin, isMobile }) => {
     const sectionNames = ['Home', 'How It Works', 'Try It', 'Genres', 'Features', 'Start'];
 
     return (
-        <div className="landing-page" ref={containerRef}>
-            {/* Scroll Progress Bar */}
-            <motion.div
-                className="scroll-progress-bar"
-                style={{ scaleX: scrollProgress / 100 }}
-            />
-
-            {/* Navigation Dots (Desktop only) */}
-            {!isMobile && (
-                <div className="nav-dots">
-                    {sectionNames.map((name, i) => (
-                        <motion.button
-                            key={i}
-                            className={`nav-dot ${activeSection === i ? 'active' : ''}`}
-                            onClick={() => scrollToSection(i)}
-                            whileHover={{ scale: 1.2 }}
-                            whileTap={{ scale: 0.9 }}
-                            title={name}
-                        >
-                            <span className="nav-dot-label">{name}</span>
-                        </motion.button>
-                    ))}
-                </div>
-            )}
-
-            {/* Back to Top Button */}
+        <>
+            {/* Welcome Unlock Overlay */}
             <AnimatePresence>
-                {showBackToTop && (
-                    <motion.button
-                        className="back-to-top"
-                        onClick={scrollToTop}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        <ChevronDown size={24} style={{ transform: 'rotate(180deg)' }} />
-                    </motion.button>
+                {!isUnlocked && (
+                    <WelcomeUnlock onUnlock={handleUnlock} />
                 )}
             </AnimatePresence>
 
-            {/* Aurora Background with Parallax */}
-            <motion.div
-                className="aurora-bg"
-                style={{ y: scrollProgress * -0.5 }}
-            >
-                <GradientOrb color="rgba(29, 185, 84, 0.4)" size={600} x={10} y={20} delay={0} />
-                <GradientOrb color="rgba(255, 75, 43, 0.3)" size={500} x={70} y={60} delay={2} />
-                <GradientOrb color="rgba(0, 210, 255, 0.3)" size={450} x={30} y={70} delay={4} />
-                <GradientOrb color="rgba(138, 43, 226, 0.25)" size={400} x={80} y={10} delay={1} />
-            </motion.div>
+            <div className={`landing-page ${!isUnlocked ? 'locked' : ''}`} ref={containerRef}>
+                {/* Scroll Progress Bar */}
+                <motion.div
+                    className="scroll-progress-bar"
+                    style={{ scaleX: scrollProgress / 100 }}
+                />
 
-            {/* Floating music notes */}
-            <div className="floating-notes">
-                {[...Array(8)].map((_, i) => (
-                    <FloatingMusicNote key={i} delay={i * 1.5} x={10 + i * 12} />
-                ))}
-            </div>
+                {/* Navigation Dots (Desktop only) */}
+                {!isMobile && (
+                    <div className="nav-dots">
+                        {sectionNames.map((name, i) => (
+                            <motion.button
+                                key={i}
+                                className={`nav-dot ${activeSection === i ? 'active' : ''}`}
+                                onClick={() => scrollToSection(i)}
+                                whileHover={{ scale: 1.2 }}
+                                whileTap={{ scale: 0.9 }}
+                                title={name}
+                            >
+                                <span className="nav-dot-label">{name}</span>
+                            </motion.button>
+                        ))}
+                    </div>
+                )}
 
-            {/* Grain overlay */}
-            <div className="grain-overlay" />
-
-            {/* Audio Toggle Button */}
-            <motion.button
-                className="audio-toggle"
-                onClick={handleAudioToggle}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 2 }}
-            >
-                {audioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
-            </motion.button>
-
-            {/* ===== HERO SECTION ===== */}
-            <section className="hero-section">
-                <div className="hero-content">
-                    <div className="logo-container">
-                        <PulseRing delay={0} />
-                        <PulseRing delay={0.5} />
-                        <PulseRing delay={1} />
-                        <motion.div
-                            className="logo-icon"
-                            animate={{
-                                rotate: [0, 5, -5, 0],
-                                scale: [1, 1.05, 1]
-                            }}
-                            transition={{ repeat: Infinity, duration: 4 }}
+                {/* Back to Top Button */}
+                <AnimatePresence>
+                    {showBackToTop && (
+                        <motion.button
+                            className="back-to-top"
+                            onClick={scrollToTop}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                         >
-                            <Music size={isMobile ? 60 : 100} color="var(--accent)" />
+                            <ChevronDown size={24} style={{ transform: 'rotate(180deg)' }} />
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+
+                {/* Aurora Background with Parallax */}
+                <motion.div
+                    className="aurora-bg"
+                    style={{ y: scrollProgress * -0.5 }}
+                >
+                    <GradientOrb color="rgba(29, 185, 84, 0.4)" size={600} x={10} y={20} delay={0} />
+                    <GradientOrb color="rgba(255, 75, 43, 0.3)" size={500} x={70} y={60} delay={2} />
+                    <GradientOrb color="rgba(0, 210, 255, 0.3)" size={450} x={30} y={70} delay={4} />
+                    <GradientOrb color="rgba(138, 43, 226, 0.25)" size={400} x={80} y={10} delay={1} />
+                </motion.div>
+
+                {/* Floating music notes */}
+                <div className="floating-notes">
+                    {[...Array(8)].map((_, i) => (
+                        <FloatingMusicNote key={i} delay={i * 1.5} x={10 + i * 12} />
+                    ))}
+                </div>
+
+                {/* Grain overlay */}
+                <div className="grain-overlay" />
+
+                {/* Audio Toggle Button */}
+                <motion.button
+                    className="audio-toggle"
+                    onClick={handleAudioToggle}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 2 }}
+                >
+                    {audioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
+                </motion.button>
+
+                {/* ===== HERO SECTION ===== */}
+                <section className="hero-section">
+                    <div className="hero-content">
+                        <div className="logo-container">
+                            <PulseRing delay={0} />
+                            <PulseRing delay={0.5} />
+                            <PulseRing delay={1} />
+                            <motion.div
+                                className="logo-icon"
+                                animate={{
+                                    rotate: [0, 5, -5, 0],
+                                    scale: [1, 1.05, 1]
+                                }}
+                                transition={{ repeat: Infinity, duration: 4 }}
+                            >
+                                <Music size={isMobile ? 60 : 100} color="var(--accent)" />
+                            </motion.div>
+                        </div>
+
+                        <motion.h1
+                            className="hero-title"
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8 }}
+                        >
+                            <HolographicText>SongSwipe</HolographicText>
+                        </motion.h1>
+
+                        <motion.p
+                            className="hero-subtitle"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                        >
+                            <TypewriterText text="Discover • Swipe • Vibe" delay={800} />
+                        </motion.p>
+
+                        <motion.div
+                            initial={{ opacity: 0, scaleX: 0 }}
+                            animate={{ opacity: 1, scaleX: 1 }}
+                            transition={{ delay: 1, duration: 0.8 }}
+                        >
+                            <Waveform />
+                        </motion.div>
+
+                        <motion.button
+                            className="cta-button"
+                            onClick={handleCTAClick}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 1.2 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <span className="cta-glow" />
+                            <Play size={24} fill="black" />
+                            <span>Start Discovering</span>
+                            <ArrowRight size={20} />
+                        </motion.button>
+
+                        <motion.div
+                            className="powered-by"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1.5 }}
+                        >
+                            <Volume2 size={16} />
+                            <span>Powered by Spotify</span>
                         </motion.div>
                     </div>
 
-                    <motion.h1
-                        className="hero-title"
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        <HolographicText>SongSwipe</HolographicText>
-                    </motion.h1>
+                    {!isMobile && (
+                        <motion.div
+                            className="scroll-indicator"
+                            animate={{ y: [0, 10, 0] }}
+                            transition={{ repeat: Infinity, duration: 1.5 }}
+                        >
+                            <span>Explore</span>
+                            <ChevronDown size={24} />
+                        </motion.div>
+                    )}
+                </section>
 
-                    <motion.p
-                        className="hero-subtitle"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.5 }}
-                    >
-                        <TypewriterText text="Discover • Swipe • Vibe" delay={800} />
-                    </motion.p>
-
-                    <motion.div
-                        initial={{ opacity: 0, scaleX: 0 }}
-                        animate={{ opacity: 1, scaleX: 1 }}
-                        transition={{ delay: 1, duration: 0.8 }}
-                    >
-                        <Waveform />
-                    </motion.div>
-
-                    <motion.button
-                        className="cta-button"
-                        onClick={handleCTAClick}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 1.2 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                    >
-                        <span className="cta-glow" />
-                        <Play size={24} fill="black" />
-                        <span>Start Discovering</span>
-                        <ArrowRight size={20} />
-                    </motion.button>
-
-                    <motion.div
-                        className="powered-by"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 1.5 }}
-                    >
-                        <Volume2 size={16} />
-                        <span>Powered by Spotify</span>
-                    </motion.div>
-                </div>
-
-                {!isMobile && (
-                    <motion.div
-                        className="scroll-indicator"
-                        animate={{ y: [0, 10, 0] }}
-                        transition={{ repeat: Infinity, duration: 1.5 }}
-                    >
-                        <span>Explore</span>
-                        <ChevronDown size={24} />
-                    </motion.div>
-                )}
-            </section>
-
-            {/* ===== HOW IT WORKS SECTION ===== */}
-            <section className="how-it-works-section">
-                <div className="section-header">
-                    <motion.h2
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                    >
-                        How It <HolographicText>Works</HolographicText>
-                    </motion.h2>
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.2 }}
-                    >
-                        Three simple steps to your next favorite song
-                    </motion.p>
-                </div>
-
-                <div className="steps-grid">
-                    <StepCard
-                        number="01"
-                        icon={ListMusic}
-                        title="Pick a Playlist"
-                        description="Choose from your Spotify playlists or let us analyze your top tracks for recommendations."
-                        delay={0}
-                    />
-                    <StepCard
-                        number="02"
-                        icon={MousePointer}
-                        title="Swipe to Discover"
-                        description="Swipe right to add songs you love, left to skip. It's that simple."
-                        delay={0.1}
-                    />
-                    <StepCard
-                        number="03"
-                        icon={Headphones}
-                        title="Build Your Vibe"
-                        description="Your choices train our AI to find even better matches for your taste."
-                        delay={0.2}
-                    />
-                </div>
-            </section>
-
-            {/* ===== DEMO SECTION ===== */}
-            {!isMobile && (
-                <section className="demo-section">
+                {/* ===== HOW IT WORKS SECTION ===== */}
+                <section className="how-it-works-section">
                     <div className="section-header">
                         <motion.h2
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                         >
-                            Try It <HolographicText>Now</HolographicText>
+                            How It <HolographicText>Works</HolographicText>
                         </motion.h2>
                         <motion.p
                             initial={{ opacity: 0 }}
@@ -1013,225 +1172,272 @@ const LandingPage = ({ onLogin, isMobile }) => {
                             viewport={{ once: true }}
                             transition={{ delay: 0.2 }}
                         >
-                            No login required. Just swipe.
+                            Three simple steps to your next favorite song
                         </motion.p>
                     </div>
 
-                    <div className="demo-layout">
-                        <motion.div
-                            className="demo-container"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                        >
-                            <DemoCard onSwipe={handleDemoSwipe} />
-                        </motion.div>
-
-                        <motion.div
-                            className="demo-info"
-                            initial={{ opacity: 0, x: 50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                        >
-                            <VinylRecord />
-                            <h3>Feel the Flow</h3>
-                            <p>Every swipe teaches us your taste. The more you swipe, the better we get at finding your perfect tracks.</p>
-                            {swipeCount > 0 && (
-                                <motion.div
-                                    className="swipe-feedback"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                >
-                                    You've swiped {swipeCount} time{swipeCount > 1 ? 's' : ''}! 🎵
-                                </motion.div>
-                            )}
-                        </motion.div>
+                    <div className="steps-grid">
+                        <StepCard
+                            number="01"
+                            icon={ListMusic}
+                            title="Pick a Playlist"
+                            description="Choose from your Spotify playlists or let us analyze your top tracks for recommendations."
+                            delay={0}
+                        />
+                        <StepCard
+                            number="02"
+                            icon={MousePointer}
+                            title="Swipe to Discover"
+                            description="Swipe right to add songs you love, left to skip. It's that simple."
+                            delay={0.1}
+                        />
+                        <StepCard
+                            number="03"
+                            icon={Headphones}
+                            title="Build Your Vibe"
+                            description="Your choices train our AI to find even better matches for your taste."
+                            delay={0.2}
+                        />
                     </div>
                 </section>
-            )}
 
-            {/* ===== GENRE SHOWCASE SECTION ===== */}
-            <section className="genre-section">
-                <div className="section-header">
-                    <motion.h2
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                    >
-                        Every <HolographicText>Genre</HolographicText>
-                    </motion.h2>
-                    <motion.p
+                {/* ===== DEMO SECTION ===== */}
+                {!isMobile && (
+                    <section className="demo-section">
+                        <div className="section-header">
+                            <motion.h2
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                            >
+                                Try It <HolographicText>Now</HolographicText>
+                            </motion.h2>
+                            <motion.p
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: 0.2 }}
+                            >
+                                No login required. Just swipe.
+                            </motion.p>
+                        </div>
+
+                        <div className="demo-layout">
+                            <motion.div
+                                className="demo-container"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                whileInView={{ opacity: 1, scale: 1 }}
+                                viewport={{ once: true }}
+                            >
+                                <DemoCard onSwipe={handleDemoSwipe} />
+                            </motion.div>
+
+                            <motion.div
+                                className="demo-info"
+                                initial={{ opacity: 0, x: 50 }}
+                                whileInView={{ opacity: 1, x: 0 }}
+                                viewport={{ once: true }}
+                            >
+                                <VinylRecord />
+                                <h3>Feel the Flow</h3>
+                                <p>Every swipe teaches us your taste. The more you swipe, the better we get at finding your perfect tracks.</p>
+                                {swipeCount > 0 && (
+                                    <motion.div
+                                        className="swipe-feedback"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                    >
+                                        You've swiped {swipeCount} time{swipeCount > 1 ? 's' : ''}! 🎵
+                                    </motion.div>
+                                )}
+                            </motion.div>
+                        </div>
+                    </section>
+                )}
+
+                {/* ===== GENRE SHOWCASE SECTION ===== */}
+                <section className="genre-section">
+                    <div className="section-header">
+                        <motion.h2
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                        >
+                            Every <HolographicText>Genre</HolographicText>
+                        </motion.h2>
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.2 }}
+                        >
+                            From underground indie to global hits
+                        </motion.p>
+                    </div>
+
+                    <div className="genre-cloud">
+                        <ShowcaseGenre genre="Indie Pop" color="#1DB954" delay={0} />
+                        <ShowcaseGenre genre="Electronic" color="#00d2ff" delay={0.05} />
+                        <ShowcaseGenre genre="Hip-Hop" color="#FF4B2B" delay={0.1} />
+                        <ShowcaseGenre genre="R&B" color="#8b5cf6" delay={0.15} />
+                        <ShowcaseGenre genre="Alternative" color="#f59e0b" delay={0.2} />
+                        <ShowcaseGenre genre="Jazz" color="#ec4899" delay={0.25} />
+                        <ShowcaseGenre genre="Soul" color="#10b981" delay={0.3} />
+                        <ShowcaseGenre genre="Lo-Fi" color="#6366f1" delay={0.35} />
+                        <ShowcaseGenre genre="Funk" color="#f97316" delay={0.4} />
+                        <ShowcaseGenre genre="Acoustic" color="#84cc16" delay={0.45} />
+                        <ShowcaseGenre genre="Synthwave" color="#a855f7" delay={0.5} />
+                        <ShowcaseGenre genre="Chill" color="#22d3ee" delay={0.55} />
+                    </div>
+
+                    <motion.div
+                        className="genre-visual"
                         initial={{ opacity: 0 }}
                         whileInView={{ opacity: 1 }}
                         viewport={{ once: true }}
-                        transition={{ delay: 0.2 }}
                     >
-                        From underground indie to global hits
-                    </motion.p>
-                </div>
-
-                <div className="genre-cloud">
-                    <ShowcaseGenre genre="Indie Pop" color="#1DB954" delay={0} />
-                    <ShowcaseGenre genre="Electronic" color="#00d2ff" delay={0.05} />
-                    <ShowcaseGenre genre="Hip-Hop" color="#FF4B2B" delay={0.1} />
-                    <ShowcaseGenre genre="R&B" color="#8b5cf6" delay={0.15} />
-                    <ShowcaseGenre genre="Alternative" color="#f59e0b" delay={0.2} />
-                    <ShowcaseGenre genre="Jazz" color="#ec4899" delay={0.25} />
-                    <ShowcaseGenre genre="Soul" color="#10b981" delay={0.3} />
-                    <ShowcaseGenre genre="Lo-Fi" color="#6366f1" delay={0.35} />
-                    <ShowcaseGenre genre="Funk" color="#f97316" delay={0.4} />
-                    <ShowcaseGenre genre="Acoustic" color="#84cc16" delay={0.45} />
-                    <ShowcaseGenre genre="Synthwave" color="#a855f7" delay={0.5} />
-                    <ShowcaseGenre genre="Chill" color="#22d3ee" delay={0.55} />
-                </div>
-
-                <motion.div
-                    className="genre-visual"
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    viewport={{ once: true }}
-                >
-                    <SoundWave />
-                    <span>100M+ tracks from Spotify's library</span>
-                    <SoundWave />
-                </motion.div>
-            </section>
-
-            {/* ===== FEATURES SECTION ===== */}
-            <section className="features-section">
-                <div className="section-header">
-                    <motion.h2
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                    >
-                        Why <HolographicText>SongSwipe</HolographicText>?
-                    </motion.h2>
-                </div>
-
-                <div className="features-grid">
-                    <FeatureCard
-                        icon={Zap}
-                        title="Lightning Fast"
-                        description="AI-powered recommendations that learn your taste in real-time. No waiting, just vibing."
-                        color="var(--accent)"
-                        delay={0}
-                    />
-                    <FeatureCard
-                        icon={Headphones}
-                        title="Instant Preview"
-                        description="30-second previews so you never add a song you don't love. Hear before you commit."
-                        color="var(--mood-hype)"
-                        delay={0.1}
-                    />
-                    <FeatureCard
-                        icon={Globe}
-                        title="Global Library"
-                        description="Access Spotify's entire catalog. From chart-toppers to hidden gems waiting to be found."
-                        color="var(--mood-chill)"
-                        delay={0.2}
-                    />
-                    <FeatureCard
-                        icon={Sparkles}
-                        title="Smart Learning"
-                        description="Every swipe makes us smarter. Your taste is unique, and we adapt to it."
-                        color="#8b5cf6"
-                        delay={0.3}
-                    />
-                    <FeatureCard
-                        icon={Radio}
-                        title="Endless Discovery"
-                        description="Never run out of new music. Our engine constantly finds fresh tracks for you."
-                        color="#f59e0b"
-                        delay={0.4}
-                    />
-                    <FeatureCard
-                        icon={Waves}
-                        title="Mood Matching"
-                        description="Morning coffee or late-night drive? We adjust recommendations to fit your vibe."
-                        color="#ec4899"
-                        delay={0.5}
-                    />
-                </div>
-            </section>
-
-            {/* ===== EXPERIENCE SECTION ===== */}
-            <section className="experience-section">
-                <motion.div
-                    className="experience-card"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                >
-                    <div className="experience-visual">
-                        <motion.div
-                            animate={{ rotate: [0, 360] }}
-                            transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}
-                            className="rotating-disc"
-                        >
-                            <Disc3 size={120} />
-                        </motion.div>
-                    </div>
-                    <div className="experience-content">
-                        <h2>Ready to Find Your Sound?</h2>
-                        <p>Join the flow and discover music that actually fits you. No algorithms pushing what's popular—just pure, personalized discovery.</p>
-                        <motion.button
-                            className="cta-button secondary"
-                            onClick={handleCTAClick}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                        >
-                            <Play size={20} fill="currentColor" />
-                            <span>Get Started Free</span>
-                        </motion.button>
-                    </div>
-                </motion.div>
-            </section>
-
-            {/* ===== MOBILE CTA SECTION ===== */}
-            {isMobile && (
-                <section className="mobile-cta-section">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                    >
-                        <Smartphone size={48} color="var(--accent)" />
-                        <h3>Swipe on the go</h3>
-                        <p>Discover new music anywhere, anytime</p>
-                        <motion.button
-                            className="cta-button"
-                            onClick={handleCTAClick}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                        >
-                            <Play size={20} fill="black" />
-                            <span>Start Now</span>
-                        </motion.button>
+                        <SoundWave />
+                        <span>100M+ tracks from Spotify's library</span>
+                        <SoundWave />
                     </motion.div>
                 </section>
-            )}
 
-            {/* ===== FOOTER ===== */}
-            <footer className="landing-footer">
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    viewport={{ once: true }}
-                >
-                    <p>
-                        Created by{' '}
-                        <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
-                            Seppe Dorissen
-                        </a>
-                    </p>
-                    <span className="ai-badge">
-                        <Cpu size={14} />
-                        Experimental AI Build
-                    </span>
-                </motion.div>
-            </footer>
-        </div>
+                {/* ===== FEATURES SECTION ===== */}
+                <section className="features-section">
+                    <div className="section-header">
+                        <motion.h2
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                        >
+                            Why <HolographicText>SongSwipe</HolographicText>?
+                        </motion.h2>
+                    </div>
+
+                    <div className="features-grid">
+                        <FeatureCard
+                            icon={Zap}
+                            title="Lightning Fast"
+                            description="AI-powered recommendations that learn your taste in real-time. No waiting, just vibing."
+                            color="var(--accent)"
+                            delay={0}
+                        />
+                        <FeatureCard
+                            icon={Headphones}
+                            title="Instant Preview"
+                            description="30-second previews so you never add a song you don't love. Hear before you commit."
+                            color="var(--mood-hype)"
+                            delay={0.1}
+                        />
+                        <FeatureCard
+                            icon={Globe}
+                            title="Global Library"
+                            description="Access Spotify's entire catalog. From chart-toppers to hidden gems waiting to be found."
+                            color="var(--mood-chill)"
+                            delay={0.2}
+                        />
+                        <FeatureCard
+                            icon={Sparkles}
+                            title="Smart Learning"
+                            description="Every swipe makes us smarter. Your taste is unique, and we adapt to it."
+                            color="#8b5cf6"
+                            delay={0.3}
+                        />
+                        <FeatureCard
+                            icon={Radio}
+                            title="Endless Discovery"
+                            description="Never run out of new music. Our engine constantly finds fresh tracks for you."
+                            color="#f59e0b"
+                            delay={0.4}
+                        />
+                        <FeatureCard
+                            icon={Waves}
+                            title="Mood Matching"
+                            description="Morning coffee or late-night drive? We adjust recommendations to fit your vibe."
+                            color="#ec4899"
+                            delay={0.5}
+                        />
+                    </div>
+                </section>
+
+                {/* ===== EXPERIENCE SECTION ===== */}
+                <section className="experience-section">
+                    <motion.div
+                        className="experience-card"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                    >
+                        <div className="experience-visual">
+                            <motion.div
+                                animate={{ rotate: [0, 360] }}
+                                transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}
+                                className="rotating-disc"
+                            >
+                                <Disc3 size={120} />
+                            </motion.div>
+                        </div>
+                        <div className="experience-content">
+                            <h2>Ready to Find Your Sound?</h2>
+                            <p>Join the flow and discover music that actually fits you. No algorithms pushing what's popular—just pure, personalized discovery.</p>
+                            <motion.button
+                                className="cta-button secondary"
+                                onClick={handleCTAClick}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <Play size={20} fill="currentColor" />
+                                <span>Get Started Free</span>
+                            </motion.button>
+                        </div>
+                    </motion.div>
+                </section>
+
+                {/* ===== MOBILE CTA SECTION ===== */}
+                {isMobile && (
+                    <section className="mobile-cta-section">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                        >
+                            <Smartphone size={48} color="var(--accent)" />
+                            <h3>Swipe on the go</h3>
+                            <p>Discover new music anywhere, anytime</p>
+                            <motion.button
+                                className="cta-button"
+                                onClick={handleCTAClick}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <Play size={20} fill="black" />
+                                <span>Start Now</span>
+                            </motion.button>
+                        </motion.div>
+                    </section>
+                )}
+
+                {/* ===== FOOTER ===== */}
+                <footer className="landing-footer">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                    >
+                        <p>
+                            Created by{' '}
+                            <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
+                                Seppe Dorissen
+                            </a>
+                        </p>
+                        <span className="ai-badge">
+                            <Cpu size={14} />
+                            Experimental AI Build
+                        </span>
+                    </motion.div>
+                </footer>
+            </div>
+        </>
     );
 };
 
