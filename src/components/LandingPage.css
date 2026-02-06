@@ -438,6 +438,21 @@ html {
     position: relative;
     z-index: 10;
     scroll-snap-align: start;
+    /* Deep Technical Vibe */
+    background: radial-gradient(circle at 50% 0%, #1a237e 0%, #000 70%);
+    box-shadow: inset 0 0 100px #000;
+}
+
+.how-it-works-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+    pointer-events: none;
 }
 
 .section-header {
@@ -534,7 +549,36 @@ html {
     position: relative;
     z-index: 10;
     scroll-snap-align: start;
-    background: radial-gradient(circle at center, rgba(29, 185, 84, 0.05) 0%, transparent 60%);
+    /* Energetic Spotlight Vibe */
+    background: radial-gradient(circle at center, rgba(139, 92, 246, 0.15) 0%, #000 60%);
+    overflow: hidden;
+}
+
+/* Moving spotlight effect behind demo */
+.demo-section::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.1) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    filter: blur(50px);
+    animation: demo-pulse 8s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes demo-pulse {
+    0% {
+        opacity: 0.5;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.2);
+    }
 }
 
 .demo-layout {
@@ -759,6 +803,12 @@ html {
     position: relative;
     z-index: 10;
     scroll-snap-align: start;
+    /* Colorful Nebula Vibe */
+    background:
+        radial-gradient(circle at 10% 20%, rgba(29, 185, 84, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.05) 0%, transparent 50%),
+        linear-gradient(to bottom, #000 0%, #050505 50%, #000 100%);
 }
 
 .genre-cloud {
@@ -824,6 +874,10 @@ html {
     position: relative;
     z-index: 10;
     scroll-snap-align: start;
+    /* Clean Dark Glass Vibe */
+    background: linear-gradient(180deg, #000 0%, #0a0a0a 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .features-grid {
@@ -877,6 +931,8 @@ html {
     position: relative;
     z-index: 10;
     scroll-snap-align: start;
+    /* Warm Golden Glow Vibe */
+    background: radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.15) 0%, transparent 60%), #000;
 }
 
 .experience-card {
