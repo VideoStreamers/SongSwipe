@@ -19,13 +19,15 @@ html {
 
     /* Ultra-smooth scrolling */
     scroll-behavior: smooth;
-    scroll-snap-type: y proximity;
+    scroll-snap-type: y mandatory;
+    /* Enforce strict snapping */
 
     /* iOS momentum scrolling */
     -webkit-overflow-scrolling: touch;
 
     /* Scroll padding for nav elements */
-    scroll-padding-top: 20px;
+    scroll-padding-top: 0;
+    /* Remove top padding to snap perfectly */
 
     /* Smooth scroll container */
     overscroll-behavior-y: contain;
