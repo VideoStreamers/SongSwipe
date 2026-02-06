@@ -763,28 +763,12 @@ const WelcomeUnlock = ({ onUnlock }) => {
                         <div className="unlock-button-inner">
                             <motion.div
                                 className="unlock-icon"
-                                animate={isHovered ? { rotate: 360 } : { rotate: 0 }}
-                                transition={{ duration: 0.6 }}
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                             >
-                                <Headphones size={48} />
+                                <Headphones size={56} />
                             </motion.div>
-                            <div className="unlock-button-bars">
-                                {[...Array(5)].map((_, i) => (
-                                    <motion.div
-                                        key={i}
-                                        className="unlock-bar"
-                                        animate={{
-                                            scaleY: [0.3, 1, 0.3],
-                                        }}
-                                        transition={{
-                                            duration: 0.6,
-                                            repeat: Infinity,
-                                            delay: i * 0.1,
-                                            ease: 'easeInOut'
-                                        }}
-                                    />
-                                ))}
-                            </div>
+                            <span className="unlock-button-text">TAP TO ENTER</span>
                         </div>
                     </motion.button>
                 </motion.div>
@@ -809,43 +793,14 @@ const WelcomeUnlock = ({ onUnlock }) => {
                     Click to unlock sound and enter the experience
                 </motion.p>
 
-                {/* Animated soundwave at the bottom */}
+                {/* Arrow indicator pointing to button */}
                 <motion.div
-                    className="unlock-soundwave"
-                    initial={{ opacity: 0, scaleX: 0 }}
-                    animate={{ opacity: 1, scaleX: 1 }}
-                    transition={{ delay: 1.1, duration: 0.8 }}
-                >
-                    {bars.map((bar, i) => (
-                        <motion.div
-                            key={i}
-                            className="unlock-soundwave-bar"
-                            animate={{
-                                height: [10, bar.height, 10],
-                            }}
-                            transition={{
-                                duration: bar.duration,
-                                repeat: Infinity,
-                                delay: bar.delay,
-                                ease: 'easeInOut'
-                            }}
-                        />
-                    ))}
-                </motion.div>
-
-                {/* Bottom hint */}
-                <motion.div
-                    className="unlock-hint"
+                    className="unlock-arrow-hint"
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.3, duration: 0.8 }}
+                    animate={{ opacity: 1, y: [0, -10, 0] }}
+                    transition={{ delay: 1.1, duration: 1.5, repeat: Infinity }}
                 >
-                    <motion.span
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                    >
-                        🎵 Tap anywhere on the button to begin 🎵
-                    </motion.span>
+                    <ChevronDown size={32} style={{ transform: 'rotate(180deg)', opacity: 0.7 }} />
                 </motion.div>
             </div>
         </motion.div>
