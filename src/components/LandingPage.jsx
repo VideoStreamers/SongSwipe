@@ -8,13 +8,14 @@ import './LandingPage.css';
 // ============================================================================
 
 // Section to audio file mapping
+// Section to audio file mapping - Real Music Tracks
 const SECTION_AUDIO = {
-    0: 'audio/sections/hero.mp3',
-    1: 'audio/sections/how-it-works.mp3',
-    2: 'audio/sections/demo.mp3',
-    3: null, // Genres section uses genre previews instead
-    4: 'audio/sections/features.mp3',
-    5: 'audio/sections/cta.mp3'
+    0: 'audio/sections/hero-theme.mp3',
+    1: 'audio/sections/how-it-works-beat.mp3',
+    2: 'audio/sections/demo-vibe.mp3',
+    3: 'audio/sections/genres-ambient.mp3', // Ambient track for genres section
+    4: 'audio/sections/features-loop.mp3',
+    5: 'audio/sections/experience-grand.mp3'
 };
 
 class SectionAudioEngine {
@@ -45,39 +46,49 @@ class SectionAudioEngine {
         }
     }
 
-    fadeIn(audio, targetVolume = this.volume) {
-        if (!audio) return;
-        audio.volume = 0;
-        let vol = 0;
-        const fade = () => {
-            vol += 0.02;
-            if (vol < targetVolume) {
-                audio.volume = vol;
-                requestAnimationFrame(fade);
-            } else {
-                audio.volume = targetVolume;
-            }
-        };
-        requestAnimationFrame(fade);
-    }
-
-    fadeOut(audio, onComplete) {
+    fadeTo(audio, targetVolume, onComplete) {
         if (!audio) {
             onComplete?.();
             return;
         }
-        let vol = audio.volume;
-        const fade = () => {
-            vol -= 0.02;
-            if (vol > 0) {
-                audio.volume = vol;
-                requestAnimationFrame(fade);
+
+        // Clear any existing fade interval (if we were tracking it)
+        // For simplicity, we just start a new loop which overtakes the old value setting
+
+        const startVolume = audio.volume;
+        const diff = targetVolume - startVolume;
+        const steps = 30; // 30 frames approx 0.5s
+        const increment = diff / steps;
+
+        let currentStep = 0;
+
+        const animate = () => {
+            currentStep++;
+            const newVol = startVolume + (increment * currentStep);
+
+            // Clamp volume
+            audio.volume = Math.max(0, Math.min(1, newVol));
+
+            if (currentStep < steps) {
+                requestAnimationFrame(animate);
             } else {
-                audio.volume = 0;
+                audio.volume = targetVolume;
                 onComplete?.();
             }
         };
-        requestAnimationFrame(fade);
+        requestAnimationFrame(animate);
+    }
+
+    duck() {
+        if (this.currentAudio) {
+            this.fadeTo(this.currentAudio, 0.05);
+        }
+    }
+
+    unduck() {
+        if (this.currentAudio) {
+            this.fadeTo(this.currentAudio, this.volume);
+        }
     }
 
     crossfadeToSection(sectionIndex) {
@@ -103,6 +114,7 @@ class SectionAudioEngine {
         }
 
         // Create new audio
+        // Create new audio
         const newAudio = new Audio(audioPath);
         newAudio.loop = true;
         newAudio.volume = 0;
@@ -110,7 +122,7 @@ class SectionAudioEngine {
         // Fade out old, fade in new
         if (this.currentAudio) {
             const oldAudio = this.currentAudio;
-            this.fadeOut(oldAudio, () => {
+            this.fadeTo(oldAudio, 0, () => {
                 oldAudio.pause();
             });
         }
@@ -118,7 +130,7 @@ class SectionAudioEngine {
         this.currentAudio = newAudio;
 
         newAudio.play().then(() => {
-            this.fadeIn(newAudio);
+            this.fadeTo(newAudio, this.volume);
         }).catch(e => {
             console.log('Section music play failed:', e);
         });
@@ -568,10 +580,14 @@ const ShowcaseGenre = ({ genre, color, delay }) => (
         whileHover={{ scale: 1.1 }}
         onHoverStart={() => {
             audioEngine.playHover();
-            genrePreviewManager.playGenrePreview(genre);
+            if (genrePreviewManager.isEnabled) {
+                audioEngine.duck();
+                genrePreviewManager.playGenrePreview(genre);
+            }
         }}
         onHoverEnd={() => {
             genrePreviewManager.stopGenrePreview();
+            audioEngine.unduck();
         }}
     >
         {genre}
