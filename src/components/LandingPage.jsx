@@ -13,24 +13,37 @@ const SECTION_AUDIO = {
     0: 'audio/sections/hero-theme.mp3',
     1: 'audio/sections/how-it-works-beat.mp3',
     2: 'audio/sections/demo-vibe.mp3',
-    3: 'audio/sections/genres-ambient.mp3', // Ambient track for genres section
+    3: 'audio/sections/genres-ambient.mp3?v=fix', // Ambient track for genres section
     4: 'audio/sections/features-loop.mp3',
     5: 'audio/sections/experience-grand.mp3'
 };
 
 class SectionAudioEngine {
     constructor() {
+        this.cache = {}; // Cache Audio objects
         this.currentAudio = null;
-        this.nextAudio = null;
         this.currentSection = -1;
         this.isEnabled = false;
         this.volume = 0.3;
-        this.fadeInterval = null;
+        this.isDucked = false;
+        this.activeFades = new Map();
+    }
+
+    preloadAll() {
+        Object.entries(SECTION_AUDIO).forEach(([index, path]) => {
+            const audio = new Audio(path);
+            audio.preload = 'auto'; // Force buffer
+            audio.loop = true;
+            audio.volume = 0;
+            this.cache[index] = audio;
+        });
     }
 
     async enable() {
         this.isEnabled = true;
-        // Start playing current section if we have one
+        // Ensure cache is ready
+        if (Object.keys(this.cache).length === 0) this.preloadAll();
+
         if (this.currentSection >= 0) {
             this.crossfadeToSection(this.currentSection);
         }
@@ -46,49 +59,66 @@ class SectionAudioEngine {
         }
     }
 
+    cancelFade(audio) {
+        if (this.activeFades.has(audio)) {
+            cancelAnimationFrame(this.activeFades.get(audio));
+            this.activeFades.delete(audio);
+        }
+    }
+
     fadeTo(audio, targetVolume, onComplete) {
         if (!audio) {
             onComplete?.();
             return;
         }
 
-        // Clear any existing fade interval (if we were tracking it)
-        // For simplicity, we just start a new loop which overtakes the old value setting
+        this.cancelFade(audio);
 
         const startVolume = audio.volume;
         const diff = targetVolume - startVolume;
-        const steps = 30; // 30 frames approx 0.5s
+        const steps = 12; // 0.2s
         const increment = diff / steps;
-
         let currentStep = 0;
 
         const animate = () => {
             currentStep++;
             const newVol = startVolume + (increment * currentStep);
-
-            // Clamp volume
             audio.volume = Math.max(0, Math.min(1, newVol));
 
             if (currentStep < steps) {
-                requestAnimationFrame(animate);
+                this.activeFades.set(audio, requestAnimationFrame(animate));
             } else {
                 audio.volume = targetVolume;
+                this.activeFades.delete(audio);
                 onComplete?.();
             }
         };
-        requestAnimationFrame(animate);
+        this.activeFades.set(audio, requestAnimationFrame(animate));
     }
 
     duck() {
+        this.isDucked = true;
         if (this.currentAudio) {
-            this.fadeTo(this.currentAudio, 0.05);
+            this.fadeTo(this.currentAudio, 0.05); // Quiet but audible
         }
     }
 
     unduck() {
+        this.isDucked = false;
         if (this.currentAudio) {
             this.fadeTo(this.currentAudio, this.volume);
         }
+    }
+
+    setVolume(newVolume) {
+        this.volume = Math.max(0, Math.min(1, newVolume));
+        if (this.currentAudio) {
+            this.fadeTo(this.currentAudio, this.isDucked ? 0.05 : this.volume);
+        }
+    }
+
+    fadeOut(audio, onComplete) {
+        this.fadeTo(audio, 0, onComplete);
     }
 
     crossfadeToSection(sectionIndex) {
@@ -98,11 +128,11 @@ class SectionAudioEngine {
         }
 
         if (sectionIndex === this.currentSection) return;
-
-        const audioPath = SECTION_AUDIO[sectionIndex];
         this.currentSection = sectionIndex;
 
-        // If no audio for this section (like genres), fade out current
+        const audioPath = SECTION_AUDIO[sectionIndex];
+
+        // Handle "No Audio" section (if any)
         if (!audioPath) {
             if (this.currentAudio) {
                 this.fadeOut(this.currentAudio, () => {
@@ -113,35 +143,51 @@ class SectionAudioEngine {
             return;
         }
 
-        // Create new audio
-        // Create new audio
-        const newAudio = new Audio(audioPath);
-        newAudio.loop = true;
-        newAudio.volume = 0;
+        // Use cache
+        let newAudio = this.cache[sectionIndex];
+        if (!newAudio) {
+            newAudio = new Audio(audioPath);
+            newAudio.loop = true;
+            newAudio.volume = 0;
+            this.cache[sectionIndex] = newAudio;
+        }
 
-        // Fade out old, fade in new
+        // Identical track? (Shouldn't happen if indices differ, but safe check)
+        if (this.currentAudio === newAudio) return;
+
+        // Fade out old
         if (this.currentAudio) {
             const oldAudio = this.currentAudio;
-            this.fadeTo(oldAudio, 0, () => {
+            this.fadeOut(oldAudio, () => {
                 oldAudio.pause();
             });
         }
 
         this.currentAudio = newAudio;
 
-        newAudio.play().then(() => {
-            this.fadeTo(newAudio, this.volume);
-        }).catch(e => {
-            console.log('Section music play failed:', e);
-        });
+        if (newAudio.paused) {
+            newAudio.currentTime = 0;
+            const playPromise = newAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    this.fadeTo(newAudio, this.isDucked ? 0.05 : this.volume);
+                }).catch(e => {
+                    console.log('Section music play failed:', e);
+                });
+            }
+        } else {
+            // If already playing, just ensure volume is correct
+            this.fadeTo(newAudio, this.isDucked ? 0.05 : this.volume);
+        }
     }
 
-    // Stub methods - these are no-ops now since we removed synthetic sounds
+    // Stubs
     playClick() { }
     playHover() { }
     playSectionTransition() { }
     playSwipe(direction) { }
 }
+
 
 const audioEngine = new SectionAudioEngine();
 
@@ -167,120 +213,148 @@ const GENRE_AUDIO_FILES = {
 
 class GenrePreviewManager {
     constructor() {
-        this.audio = null;
+        this.cache = {}; // Cache of Audio objects
+        this.currentAudio = null;
         this.isEnabled = false;
         this.currentGenre = null;
-        this.hoverTimeout = null;
+        this.volume = 0.3;
+        this.activeFades = new Map(); // Map<Audio, number> (animationFrameId)
     }
 
-    init() {
-        if (this.audio) return;
-        this.audio = new Audio();
-        this.audio.volume = 0;
+    preloadAll() {
+        Object.entries(GENRE_AUDIO_FILES).forEach(([genre, url]) => {
+            const audio = new Audio(url);
+            audio.preload = 'auto';
+            audio.volume = 0;
+            audio.loop = true;
+            this.cache[genre] = audio;
+        });
     }
 
-    async enable() {
-        this.init();
+    enable() {
         this.isEnabled = true;
+        // Ensure cache is populated if not already
+        if (Object.keys(this.cache).length === 0) {
+            this.preloadAll();
+        }
     }
 
     disable() {
         this.isEnabled = false;
-        if (this.audio) {
-            this.fadeOut();
-            setTimeout(() => this.audio?.pause(), 400);
+        this.stopGenrePreview();
+    }
+
+    setVolume(vol) {
+        this.volume = vol;
+        // Update volume of currently playing track
+        if (this.currentAudio && !this.currentAudio.paused) {
+            this.currentAudio.volume = vol; // Snap volume
         }
     }
 
-    fadeIn() {
-        if (!this.audio) return;
-        let vol = 0;
-        this.audio.volume = 0;
-        const fade = () => {
-            vol += 0.05;
-            if (vol < 0.5) {
-                this.audio.volume = vol;
-                requestAnimationFrame(fade);
-            } else {
-                this.audio.volume = 0.5;
-            }
-        };
-        requestAnimationFrame(fade);
+    cancelFade(audio) {
+        if (this.activeFades.has(audio)) {
+            cancelAnimationFrame(this.activeFades.get(audio));
+            this.activeFades.delete(audio);
+        }
     }
 
-    fadeOut() {
-        if (!this.audio) return;
-        let vol = this.audio.volume;
+    fadeIn(audio) {
+        if (!audio) return;
+        this.cancelFade(audio);
+
+        audio.volume = 0;
+        const target = this.volume;
+        const step = target / 15; // 15 frames (~0.25s)
+
         const fade = () => {
-            vol -= 0.05;
-            if (vol > 0) {
-                this.audio.volume = vol;
-                requestAnimationFrame(fade);
+            // If volume changed externally (slider), update target dynamic check?
+            // For simplicity, fade to *current* this.volume
+            const currentTarget = this.volume;
+
+            let nextVol = audio.volume + step;
+            if (nextVol < currentTarget) {
+                audio.volume = nextVol;
+                this.activeFades.set(audio, requestAnimationFrame(fade));
             } else {
-                this.audio.volume = 0;
+                audio.volume = currentTarget;
+                this.activeFades.delete(audio);
             }
         };
-        requestAnimationFrame(fade);
+        this.activeFades.set(audio, requestAnimationFrame(fade));
     }
 
-    getPreviewUrl(genre) {
-        return GENRE_AUDIO_FILES[genre] || null;
+    fadeOut(audio) {
+        if (!audio) return;
+        this.cancelFade(audio);
+
+        const step = audio.volume / 15;
+
+        const fade = () => {
+            let nextVol = audio.volume - step;
+            if (nextVol > 0) {
+                audio.volume = nextVol;
+                this.activeFades.set(audio, requestAnimationFrame(fade));
+            } else {
+                audio.volume = 0;
+                audio.pause();
+                audio.currentTime = 0; // Reset for next play
+                this.activeFades.delete(audio);
+            }
+        };
+        this.activeFades.set(audio, requestAnimationFrame(fade));
     }
 
     playGenrePreview(genre) {
         if (!this.isEnabled) return;
 
-        // Clear any pending hover timeout
-        if (this.hoverTimeout) {
-            clearTimeout(this.hoverTimeout);
+        // Fast switch: update target genre immediately
+        this.currentGenre = genre;
+
+        const nextAudio = this.cache[genre];
+        if (!nextAudio) {
+            // Fallback if cache missing (shouldn't happen if preloaded)
+            this.preloadAll(); // Try to recover
+            return;
         }
 
-        // 300ms delay to prevent accidental triggers
-        this.hoverTimeout = setTimeout(async () => {
-            if (this.currentGenre === genre) return;
+        // Prepare next audio
+        // Reset state if it was fading out
+        this.cancelFade(nextAudio);
 
-            this.currentGenre = genre;
+        // If it's already playing (the current one), do nothing
+        if (this.currentAudio === nextAudio && !nextAudio.paused) return;
 
-            // Fade out current audio if playing
-            if (this.audio && !this.audio.paused) {
-                this.fadeOut();
-                await new Promise(r => setTimeout(r, 200));
-                this.audio.pause();
-            }
+        // Fade out OLD current
+        if (this.currentAudio && this.currentAudio !== nextAudio) {
+            this.fadeOut(this.currentAudio);
+        }
 
-            // Get static preview URL
-            const previewUrl = this.getPreviewUrl(genre);
+        // Play NEW
+        this.currentAudio = nextAudio;
+        nextAudio.volume = 0;
+        nextAudio.currentTime = 0;
 
-            if (previewUrl && this.currentGenre === genre) {
-                this.init();
-                this.audio.src = previewUrl;
-                this.audio.currentTime = 0;
-
-                try {
-                    await this.audio.play();
-                    this.fadeIn();
-                } catch (e) {
-                    console.log('Preview play failed:', e);
+        const playPromise = nextAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                this.fadeIn(nextAudio);
+            }).catch(e => {
+                // Auto-play policy or interrupted
+                // Check if we switched away while loading
+                if (this.currentAudio !== nextAudio) {
+                    nextAudio.pause();
+                    nextAudio.volume = 0;
                 }
-            }
-        }, 300);
+            });
+        }
     }
 
     stopGenrePreview() {
-        // Clear pending hover
-        if (this.hoverTimeout) {
-            clearTimeout(this.hoverTimeout);
-            this.hoverTimeout = null;
-        }
-
         this.currentGenre = null;
-
-        // Fade out and stop
-        if (this.audio && !this.audio.paused) {
-            this.fadeOut();
-            setTimeout(() => {
-                this.audio?.pause();
-            }, 400);
+        if (this.currentAudio) {
+            this.fadeOut(this.currentAudio);
+            this.currentAudio = null;
         }
     }
 }
@@ -568,33 +642,7 @@ const FeatureCard = ({ icon: Icon, title, description, color, delay = 0 }) => (
     </motion.div>
 );
 
-// Showcase Card (for the music showcase section)
-const ShowcaseGenre = ({ genre, color, delay, onHover }) => (
-    <motion.div
-        className="showcase-genre"
-        style={{ '--genre-color': color }}
-        initial={{ opacity: 0, scale: 0.8 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
-        transition={{ delay, type: 'spring' }}
-        whileHover={{ scale: 1.1 }}
-        onHoverStart={() => {
-            audioEngine.playHover();
-            if (genrePreviewManager.isEnabled) {
-                audioEngine.duck();
-                genrePreviewManager.playGenrePreview(genre);
-            }
-            onHover?.(true);
-        }}
-        onHoverEnd={() => {
-            genrePreviewManager.stopGenrePreview();
-            audioEngine.unduck();
-            onHover?.(false);
-        }}
-    >
-        {genre}
-    </motion.div>
-);
+
 
 // Vinyl Record Animation
 const VinylRecord = () => (
@@ -847,66 +895,629 @@ const GENRES_DATA = [
 // Immersive Background Effect Component
 const GenreBackground = ({ data }) => {
     if (!data) return null;
+    const { name, color, vibe } = data;
 
-    const { color, vibe } = data;
+    // --- Advanced Sub-components for Dynamic Randomization ---
 
-    // Particle variants based on vibe
+    const GlitchStrip = ({ color }) => {
+        const [pos, setPos] = useState({ top: Math.random() * 100, left: Math.random() * 100 });
+        useEffect(() => {
+            const timer = setInterval(() => {
+                setPos({ top: Math.random() * 100, left: Math.random() * 60 + 20 });
+            }, 300 + Math.random() * 1000);
+            return () => clearInterval(timer);
+        }, []);
+        return (
+            <motion.div
+                key={`${pos.top}-${pos.left}`}
+                style={{
+                    position: 'absolute', top: `${pos.top}%`, left: `${pos.left}%`,
+                    width: Math.random() * 200 + 50, height: Math.random() * 3 + 1,
+                    background: color, boxShadow: `0 0 15px ${color}`,
+                    opacity: 0.8, pointerEvents: 'none', zIndex: 10
+                }}
+                initial={{ opacity: 0, scaleX: 0 }}
+                animate={{ opacity: [0, 1, 0], scaleX: [0, 1.5, 0] }}
+                transition={{ duration: 0.15 }}
+            />
+        );
+    };
+
+    const LightningBolt = ({ color }) => {
+        const [pos, setPos] = useState({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 });
+        useEffect(() => {
+            const timer = setInterval(() => {
+                setPos({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 });
+            }, 1200 + Math.random() * 1000);
+            return () => clearInterval(timer);
+        }, []);
+        return (
+            <motion.div
+                key={`${pos.x}-${pos.y}`}
+                style={{ position: 'absolute', left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+                initial={{ opacity: 0, scale: 0.2 }}
+                animate={{ opacity: [0, 1, 0, 1, 0], scale: [1, 1.4, 1.1], rotate: [0, 15, -15, 0] }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+                <Zap size={180} color={color} style={{ filter: `drop-shadow(0 0 35px ${color})`, opacity: 0.9 }} />
+            </motion.div>
+        );
+    };
+
+    const BeatBar = ({ color, i, count }) => (
+        <motion.div
+            style={{
+                width: `${100 / count}%`,
+                height: '100%',
+                background: `linear-gradient(to top, ${color}40, ${color}10, transparent)`,
+                margin: '0 2px',
+                borderRadius: '4px 4px 0 0'
+            }}
+            animate={{
+                height: [
+                    `${20 + Math.random() * 40}%`,
+                    `${40 + Math.random() * 50}%`,
+                    `${10 + Math.random() * 30}%`
+                ]
+            }}
+            transition={{
+                duration: 0.5 + Math.random() * 0.5,
+                repeat: Infinity,
+                ease: "easeInOut"
+            }}
+        />
+    );
+
+    const SpraySplatter = ({ color }) => {
+        const [pos] = useState(() => ({
+            left: Math.random() * 80 + 10,
+            top: Math.random() * 80 + 10,
+            size: Math.random() * 150 + 100,
+            rotate: Math.random() * 360
+        }));
+        return (
+            <motion.div
+                style={{
+                    position: 'absolute', left: `${pos.left}%`, top: `${pos.top}%`,
+                    width: pos.size, height: pos.size, borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%',
+                    background: `radial-gradient(circle, ${color}30 0%, transparent 70%)`,
+                    filter: 'blur(25px)', transform: `rotate(${pos.rotate}deg)`,
+                    mixBlendMode: 'screen'
+                }}
+                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 4 + Math.random() * 4, repeat: Infinity }}
+            />
+        );
+    };
+
+    const AlternativeShape = ({ color }) => {
+        const [config, setConfig] = useState(null);
+        const generate = useCallback(() => ({
+            id: Math.random(),
+            left: Math.random() * 90 + 5,
+            top: Math.random() * 90 + 5,
+            size: Math.random() * 120 + 60,
+            isSquare: Math.random() > 0.5,
+            duration: Math.random() * 5 + 4,
+            rotate: Math.random() * 360,
+            driftX: (Math.random() - 0.5) * 150,
+            driftY: (Math.random() - 0.5) * 150,
+        }), []);
+
+        useEffect(() => {
+            setConfig(generate());
+            const timer = setInterval(() => {
+                setConfig(generate());
+            }, 6000 + Math.random() * 3000);
+            return () => clearInterval(timer);
+        }, [generate]);
+
+        if (!config) return null;
+
+        return (
+            <motion.div
+                key={config.id}
+                initial={{ opacity: 0, scale: 0.2, rotate: config.rotate }}
+                animate={{
+                    opacity: [0, 0.15, 0.15, 0],
+                    scale: [0.7, 1.1, 1.1, 0.8],
+                    rotate: config.rotate + 180,
+                    x: [0, config.driftX],
+                    y: [0, config.driftY]
+                }}
+                transition={{
+                    duration: config.duration,
+                    ease: "linear",
+                    times: [0, 0.2, 0.8, 1]
+                }}
+                style={{
+                    position: 'absolute', left: `${config.left}%`, top: `${config.top}%`,
+                    width: config.size, height: config.size, background: color,
+                    clipPath: config.isSquare ? 'none' : 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                    boxShadow: `0 0 35px ${color}30`,
+                    filter: 'contrast(1.2) brightness(1.1)'
+                }}
+            />
+        );
+    };
+
+
+
+    const StringRipple = ({ color, top }) => (
+        <motion.div
+            style={{
+                position: 'absolute', left: 0, right: 0, top: top,
+                height: '1px', background: color,
+                opacity: 0, pointerEvents: 'none',
+                boxShadow: `0 0 12px ${color}`
+            }}
+            animate={{
+                opacity: [0, 0.8, 0],
+                scaleY: [1, 20, 1],
+                y: [-2, 15, -15, 8, -8, 0]
+            }}
+            transition={{
+                duration: 0.8, repeat: Infinity,
+                repeatDelay: 1 + Math.random() * 2,
+                ease: "easeOut"
+            }}
+        />
+    );
+
+    const SoulFlare = ({ color }) => {
+        const [pos] = useState(() => ({
+            left: Math.random() * 100,
+            top: Math.random() * 100,
+            size: Math.random() * 400 + 400,
+            delay: Math.random() * 4
+        }));
+        return (
+            <motion.div
+                style={{
+                    position: 'absolute', left: `${pos.left}%`, top: `${pos.top}%`,
+                    width: pos.size, height: pos.size, borderRadius: '50%',
+                    background: `radial-gradient(circle, ${color}30 0%, transparent 70%)`,
+                    filter: 'blur(60px)', mixBlendMode: 'screen',
+                    transform: 'translate(-50%, -50%)'
+                }}
+                animate={{ opacity: [0.2, 0.6, 0.2], scale: [1, 1.2, 1] }}
+                transition={{ duration: 8, repeat: Infinity, delay: pos.delay }}
+            />
+        );
+    };
+
+    const CRTOverlay = () => (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 100, overflow: 'hidden' }}>
+            <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.1), rgba(0, 255, 0, 0.05), rgba(0, 0, 255, 0.1))',
+                backgroundSize: '100% 6px, 4px 100%',
+                opacity: 0.8
+            }} />
+            <motion.div
+                style={{ position: 'absolute', inset: 0, background: 'url(https://grainy-gradients.vercel.app/noise.svg)', opacity: 0.15, mixBlendMode: 'overlay' }}
+                animate={{ x: [-2, 2, -1, 1], y: [1, -1, 2, -2] }}
+                transition={{ duration: 0.1, repeat: Infinity }}
+            />
+            <div style={{ position: 'absolute', inset: 0, boxShadow: 'inset 0 0 300px rgba(0,0,0,1)' }} />
+        </div>
+    );
+
+    const CyberFloor = ({ color }) => (
+        <div style={{
+            position: 'absolute', bottom: 0, left: 0, width: '100%', height: '50vh',
+            zIndex: 10, pointerEvents: 'none', overflow: 'hidden'
+        }}>
+            <motion.div
+                style={{
+                    position: 'absolute', width: '200%', height: '200%',
+                    left: '-50%', top: 0,
+                    backgroundImage: `
+                        linear-gradient(to right, ${color}20 1px, transparent 1px),
+                        linear-gradient(to bottom, ${color}20 1px, transparent 1px)
+                    `,
+                    backgroundSize: '100px 100px',
+                    transform: 'perspective(500px) rotateX(70deg)',
+                    transformOrigin: '50% 0%'
+                }}
+                animate={{ backgroundPosition: ['0px 0px', '0px 100px'] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            />
+            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, #000 0%, ${color}10 50%, transparent)` }} />
+        </div>
+    );
+
+    const RetroSun = ({ color }) => (
+        <div style={{
+            position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)',
+            width: '600px', height: '600px', pointerEvents: 'none', zIndex: -1
+        }}>
+            <motion.div
+                style={{
+                    width: '100%', height: '100%', borderRadius: '50%',
+                    background: `linear-gradient(to bottom, ${color} 0%, transparent 98%)`,
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 10%, transparent 11%, black 12%, black 22%, transparent 23%, black 24%, black 34%, transparent 35%, black 36%, black 46%, transparent 47%, black 48%, black 58%, transparent 59%, black 60%, black 70%, transparent 71%, black 72%, black 82%, transparent 83%, black 84%, black 94%, transparent 95%, black 96%)'
+                }}
+                animate={{ opacity: [0.5, 0.8, 0.5], scale: [1, 1.05, 1] }}
+                transition={{ duration: 4, repeat: Infinity }}
+            />
+        </div>
+    );
+
     const getParticleVariants = (i) => {
         const base = {
-            opacity: [0.3, 0.8, 0.3],
-            scale: [1, 1.5, 1],
+            opacity: [0.3, 0.6, 0.3],
+            boxShadow: `0 0 ${15 + Math.random() * 25}px ${color}`,
         };
-
         switch (vibe) {
-            case 'calm': // Slow, gentle drift
+            case 'electric':
                 return {
                     ...base,
-                    y: [0, -30, 0],
-                    x: [0, 20, 0],
-                    transition: { duration: 8 + Math.random() * 5, repeat: Infinity, ease: "easeInOut" }
+                    x: [0, Math.random() * 100 - 50, Math.random() * 100 - 50, 0],
+                    y: [0, Math.random() * 100 - 50, Math.random() * 100 - 50, 0],
+                    opacity: [0, 1, 0, 1, 0],
+                    transition: { duration: 0.2, repeat: Infinity, repeatDelay: Math.random() * 2 }
                 };
-            case 'wavy': // Sine wave motion
+            case 'floaty':
                 return {
                     ...base,
-                    y: [0, -50, 0],
-                    x: [0, 50, -50, 0],
-                    transition: { duration: 6 + Math.random() * 4, repeat: Infinity, ease: "easeInOut" }
-                };
-            case 'floaty': // Upward floating bubbles
-                return {
-                    opacity: [0, 1, 0],
                     y: [100, -100],
-                    scale: [0.5, 1.5],
-                    transition: { duration: 5 + Math.random() * 5, repeat: Infinity, ease: "easeOut" }
+                    opacity: [0, 0.8, 0],
+                    transition: { duration: 4 + Math.random() * 4, repeat: Infinity, ease: "easeInOut" }
                 };
-            case 'bouncy': // Energetic pulses
+            case 'calm':
                 return {
-                    scale: [1, 2, 1],
-                    opacity: [0.5, 1, 0.5],
-                    transition: { duration: 0.5 + Math.random() * 0.5, repeat: Infinity, ease: "easeInOut" }
-                };
-            case 'electric': // Fast, erratic glitch
-                return {
-                    opacity: [1, 0, 1, 0.5, 1],
-                    x: [0, 10, -10, 0],
-                    y: [0, -10, 10, 0],
-                    transition: { duration: 0.2 + Math.random() * 0.3, repeat: Infinity }
-                };
-            case 'chaos': // Random rapid movement
-                return {
-                    x: [0, Math.random() * 100 - 50],
-                    y: [0, Math.random() * 100 - 50],
-                    opacity: [1, 0.5, 1],
-                    transition: { duration: 2, repeat: Infinity, type: "spring", stiffness: 100 }
+                    ...base,
+                    x: [0, 40, 0],
+                    y: [0, 40, 0],
+                    scale: [1, 1.2, 1],
+                    transition: { duration: 8 + Math.random() * 4, repeat: Infinity, ease: "easeInOut" }
                 };
             default:
-                return base;
+                return {
+                    ...base,
+                    x: [0, 60, -60, 0],
+                    y: [0, 40, -40, 0],
+                    rotate: [0, 180, 360],
+                    transition: { duration: 5 + Math.random() * 5, repeat: Infinity, ease: "easeInOut" }
+                };
+        }
+    };
+
+    const AcousticString = ({ color, i }) => {
+        const [isPlucked, setIsPlucked] = useState(false);
+        useEffect(() => {
+            const pluck = () => {
+                setIsPlucked(true);
+                setTimeout(() => setIsPlucked(false), 1200);
+                setTimeout(pluck, 1800 + Math.random() * 3000);
+            };
+            const initialDelay = Math.random() * 3000;
+            const timer = setTimeout(pluck, initialDelay);
+            return () => clearTimeout(timer);
+        }, []);
+
+        return (
+            <div style={{ position: 'relative', width: '100%', height: '60px', marginBottom: '20px' }}>
+                <svg width="100%" height="100%" viewBox="0 0 1000 60" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                    <motion.path
+                        d="M 0 30 Q 500 30 1000 30"
+                        stroke={color}
+                        strokeWidth="1.5"
+                        fill="none"
+                        animate={isPlucked ? {
+                            d: [
+                                "M 0 30 Q 500 30 1000 30",
+                                `M 0 30 Q 500 ${30 + (i % 2 === 0 ? 30 : -30)} 1000 30`,
+                                `M 0 30 Q 500 ${30 + (i % 2 === 0 ? -20 : 20)} 1000 30`,
+                                `M 0 30 Q 500 ${30 + (i % 2 === 0 ? 10 : -10)} 1000 30`,
+                                "M 0 30 Q 500 30 1000 30"
+                            ],
+                            opacity: [0.3, 1, 0.5, 0.8, 0.3]
+                        } : { opacity: 0.3 }}
+                        transition={{ duration: 1.2, ease: "easeInOut" }}
+                        style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+                    />
+                </svg>
+                {/* Pluck Soundwave triggered on pluck */}
+                <AnimatePresence>
+                    {isPlucked && (
+                        <motion.div
+                            key="ripple"
+                            initial={{ scale: 1, opacity: 0.8, left: '50%', top: '50%' }}
+                            animate={{ scale: 30, opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 1.2, ease: "easeOut" }}
+                            style={{
+                                position: 'absolute', width: 10, height: 10, borderRadius: '50%',
+                                border: `1.5px solid ${color}`, transform: 'translate(-50%, -50%)',
+                                zIndex: -1
+                            }}
+                        />
+                    )}
+                </AnimatePresence>
+            </div>
+        );
+    };
+
+    // --- Core Render Logic ---
+    const renderThemeElements = () => {
+        switch (name) {
+            case 'Acoustic':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', left: 0, right: 0, top: '35%', height: '30%', display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: 0.9 }}>
+                            {[...Array(6)].map((_, i) => (
+                                <AcousticString key={`string-${i}`} color={color} i={i} />
+                            ))}
+                        </div>
+                        {/* Sunbeam Dust */}
+                        {[...Array(25)].map((_, i) => (
+                            <motion.div
+                                key={`dust-${i}`}
+                                style={{ position: 'absolute', width: '3px', height: '3px', borderRadius: '50%', background: color, opacity: 0.2 }}
+                                animate={{
+                                    left: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
+                                    top: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
+                                    opacity: [0, 0.4, 0]
+                                }}
+                                transition={{ duration: 6 + Math.random() * 6, repeat: Infinity }}
+                            />
+                        ))}
+                    </div>
+                );
+            case 'Electronic':
+                return (
+                    <>
+                        <motion.div style={{ position: 'absolute', inset: 0, background: 'white', mixBlendMode: 'overlay', zIndex: 100 }} animate={{ opacity: [0, 0.15, 0, 0, 0.05, 0] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                            {[...Array(20)].map((_, i) => <GlitchStrip key={i} color={color} />)}
+                            {[...Array(3)].map((_, i) => <LightningBolt key={i} color={color} />)}
+                        </div>
+                    </>
+                );
+            case 'Synthwave':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        <RetroSun color={color} />
+                        <CyberFloor color={color} />
+                        {/* Flying Star Lines */}
+                        {[...Array(5)].map((_, i) => (
+                            <motion.div
+                                key={`starline-${i}`}
+                                style={{ position: 'absolute', width: '100px', height: '1px', background: 'white', opacity: 0.5 }}
+                                animate={{ x: ['-20%', '120%'], y: [`${Math.random() * 60}%`, `${Math.random() * 60}%`] }}
+                                transition={{ duration: 1 + Math.random() * 2, repeat: Infinity, delay: i }}
+                            />
+                        ))}
+                    </div>
+                );
+            case 'Hip-Hop':
+                // BASS IMPACT & SHOCKWAVES (Viewport-Locked Center)
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+                        {/* Target exactly 50vw/50vh to bypass any container offsets */}
+                        <div style={{ position: 'fixed', left: '50vw', top: '50vh', width: 0, height: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* Dynamic Speaker Core */}
+                            <motion.div
+                                style={{
+                                    width: 300, height: 300, borderRadius: '50%',
+                                    background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+                                    opacity: 0.5, filter: 'blur(40px)', position: 'absolute'
+                                }}
+                                animate={{ scale: [0.8, 1.5, 0.8] }}
+                                transition={{ duration: 0.4, repeat: Infinity, ease: "easeOut" }}
+                            />
+                            {/* Radiating Shockwaves */}
+                            {[...Array(5)].map((_, i) => (
+                                <motion.div
+                                    key={`wave-${i}`}
+                                    style={{
+                                        width: 100, height: 100, borderRadius: '50%',
+                                        border: `2px solid ${color}40`, position: 'absolute'
+                                    }}
+                                    animate={{ scale: [1, 18], opacity: [0.8, 0] }}
+                                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.5, ease: "easeOut" }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'Funk':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        {[...Array(40)].map((_, i) => (
+                            <motion.div
+                                key={`disco-${i}`}
+                                style={{
+                                    position: 'absolute', width: '6px', height: '6px',
+                                    borderRadius: '50%', background: '#ffcc33',
+                                    boxShadow: `0 0 10px #ffcc33, 0 0 20px ${color}40`
+                                }}
+                                animate={{
+                                    left: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
+                                    top: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
+                                    scale: [0.4, 1.2, 0.4],
+                                    opacity: [0, 0.4, 0]
+                                }}
+                                transition={{ duration: 5 + Math.random() * 5, repeat: Infinity }}
+                            />
+                        ))}
+                    </div>
+                );
+            case 'R&B':
+                // Molten Liquid Soul
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+                        {[...Array(5)].map((_, i) => (
+                            <motion.div
+                                key={`rnb-molten-${i}`}
+                                style={{
+                                    position: 'absolute',
+                                    width: 600 + i * 200, height: 600 + i * 200,
+                                    background: `radial-gradient(circle, ${color}${25 - i * 4} 0%, transparent 70%)`,
+                                    borderRadius: '50%', filter: 'blur(80px)', mixBlendMode: 'screen'
+                                }}
+                                animate={{
+                                    x: [Math.random() * 200 - 100, Math.random() * 200 - 100],
+                                    y: [Math.random() * 200 - 100, Math.random() * 200 - 100],
+                                    scale: [1, 1.25, 1],
+                                    rotate: [0, 360]
+                                }}
+                                transition={{ duration: 20 + i * 10, repeat: Infinity, ease: 'easeInOut' }}
+                            />
+                        ))}
+                    </div>
+                );
+            case 'Soul':
+                // Vintage Warm Atmosphere (Warm Flares & Dusty Bokeh)
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        {[...Array(8)].map((_, i) => <SoulFlare key={`soul-flare-${i}`} color={color} />)}
+                        {/* Golden Particles */}
+                        <div className="soul-bokeh">
+                            {[...Array(25)].map((_, i) => (
+                                <motion.div
+                                    key={`bokeh-${i}`}
+                                    style={{
+                                        position: 'absolute', width: 20 + Math.random() * 60, height: 20 + Math.random() * 60,
+                                        borderRadius: '50%', background: `${color}40`, filter: 'blur(10px)',
+                                        left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`
+                                    }}
+                                    animate={{ opacity: [0, 0.5, 0], scale: [0.8, 1.2, 0.8], y: [0, -40, 0] }}
+                                    transition={{ duration: 5 + Math.random() * 5, repeat: Infinity }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'Jazz':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.4 }}>
+                        {[...Array(5)].map((_, i) => (
+                            <motion.div
+                                key={`jazz-line-${i}`}
+                                style={{
+                                    position: 'absolute', width: '120%', height: '1px', background: color,
+                                    left: '-10%', top: `${45 + i * 3}%`, boxShadow: `0 0 5px ${color}`
+                                }}
+                                animate={{ y: [0, 20, -20, 0], opacity: [0.2, 0.8, 0.2] }}
+                                transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
+                            />
+                        ))}
+                        {[...Array(8)].map((_, i) => (
+                            <motion.div
+                                key={`jazz-note-${i}`}
+                                style={{ position: 'absolute', left: `${10 + (i * 12)}%`, bottom: '-10%' }}
+                                animate={{ y: ['0vh', '-120vh'], x: [0, Math.sin(i) * 100, 0], rotate: [0, 45, -45, 0], opacity: [0, 1, 0] }}
+                                transition={{ duration: 8 + Math.random() * 5, repeat: Infinity, ease: 'linear', delay: i * 0.8 }}
+                            >
+                                <Music size={40 + i * 5} color={color} style={{ filter: `drop-shadow(0 0 15px ${color})` }} />
+                            </motion.div>
+                        ))}
+                    </div>
+                );
+            case 'Chill':
+                // Accelerated Bubble Environment
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+                        {[...Array(12)].map((_, i) => (
+                            <motion.div
+                                key={`bubble-${i}`}
+                                style={{
+                                    position: 'absolute', width: 150 + Math.random() * 300, height: 150 + Math.random() * 300,
+                                    borderRadius: '50%', background: `radial-gradient(circle, ${color}40, transparent 75%)`,
+                                    filter: 'blur(20px)', mixBlendMode: 'screen'
+                                }}
+                                initial={{ opacity: 0, top: '110%' }}
+                                animate={{
+                                    left: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
+                                    top: [`${110}%`, `-20%`],
+                                    scale: [1, 1.3, 1], opacity: [0, 0.8, 0]
+                                }}
+                                transition={{ duration: 8 + Math.random() * 6, repeat: Infinity, ease: "linear" }}
+                            />
+                        ))}
+                    </div>
+                );
+            case 'Lo-Fi':
+                // VHS Room Vibes
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+                        <CRTOverlay />
+                        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 10% 90%, ${color}15 0%, transparent 60%)` }} />
+                        {[...Array(20)].map((_, i) => (
+                            <motion.div
+                                key={`rain-${i}`}
+                                style={{
+                                    position: 'absolute', width: 1, height: 100,
+                                    background: `linear-gradient(to bottom, transparent, ${color}40)`,
+                                    left: `${Math.random() * 100}%`
+                                }}
+                                animate={{ top: ['-20%', '120%'], opacity: [0, 0.3, 0] }}
+                                transition={{ duration: 1, repeat: Infinity, delay: Math.random() * 2 }}
+                            />
+                        ))}
+                        <motion.div
+                            style={{ position: 'absolute', bottom: 0, width: '100%', height: '2px', background: `${color}40`, opacity: 0 }}
+                            animate={{ opacity: [0, 0.5, 0], y: [-5, 5] }}
+                            transition={{ duration: 0.1, repeat: Infinity }}
+                        />
+                    </div>
+                );
+            case 'Alternative':
+                // SCRAPBOOK NOISE - Collage Respawn
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+                        {[...Array(15)].map((_, i) => <AlternativeShape key={`shape-${i}`} color={color} />)}
+
+                        {/* Jitter Grid */}
+                        <div style={{
+                            position: 'absolute', inset: 0,
+                            backgroundImage: `linear-gradient(transparent 98%, ${color}20 98%), linear-gradient(90deg, transparent 98%, ${color}20 98%)`,
+                            backgroundSize: '30px 30px', opacity: 0.2
+                        }} />
+                    </div>
+                );
+            case 'Indie Pop':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        {[...Array(15)].map((_, i) => (
+                            <motion.div
+                                key={`heart-${i}`}
+                                style={{
+                                    position: 'absolute', left: `${Math.random() * 100}%`, bottom: '-10%',
+                                }}
+                                animate={{ y: ['0vh', '-120vh'], scale: [0.5, 1.2, 0.5], rotate: [0, 45, -45, 0], opacity: [0, 0.7, 0] }}
+                                transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, delay: i * 0.5 }}
+                            >
+                                <Heart size={40 + i * 2} color={color} fill={color} style={{ filter: `blur(${Math.random() * 4}px)`, opacity: 0.4 }} />
+                            </motion.div>
+                        ))}
+                    </div>
+                );
+            case 'Pop':
+                return (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        {[...Array(20)].map((_, i) => (
+                            <motion.div
+                                key={`pop-spark-${i}`}
+                                style={{ position: 'absolute', left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+                                animate={{ scale: [0, 2, 0], opacity: [0, 1, 0] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: Math.random() * 3 }}
+                            >
+                                <Sparkles size={60 + Math.random() * 60} color={color} style={{ filter: `drop-shadow(0 0 20px ${color})` }} />
+                            </motion.div>
+                        ))}
+                    </div>
+                );
+            default:
+                return null;
         }
     };
 
     return (
         <motion.div
-            className="genre-immersive-bg"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -917,49 +1528,189 @@ const GenreBackground = ({ data }) => {
                 left: 0,
                 width: '100%',
                 height: '100%',
-                background: `radial-gradient(circle at center, ${color}30 0%, transparent 80%)`,
+                zIndex: 1,
                 pointerEvents: 'none',
-                zIndex: 1 // Behind content but above base bg
+                // Richer gradient base
+                background: `radial-gradient(circle at 50% 50%, ${color}25 0%, #050505 85%)`,
+                overflow: 'hidden'
             }}
         >
-            <div className="genre-particles" style={{ overflow: 'hidden', width: '100%', height: '100%', position: 'absolute' }}>
-                {[...Array(30)].map((_, i) => (
+            {/* 1. Large Fluid Blobs (Background Atmosphere) */}
+            <motion.div
+                animate={{
+                    scale: [1, 1.3, 1],
+                    rotate: [0, 5, -5, 0],
+                    background: `radial-gradient(circle at 50% 50%, ${color}15 0%, transparent 65%)`
+                }}
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                style={{ position: 'absolute', inset: 0 }}
+            />
+
+            {/* 2. Theme Specific Elements (NEW) */}
+            {renderThemeElements()}
+
+            {/* 3. Strong Spotlight (Center Focus) */}
+            <div style={{
+                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                width: '70vw', height: '70vw',
+                background: `radial-gradient(circle, ${color}30 0%, transparent 70%)`,
+                opacity: 0.8,
+                filter: 'blur(80px)',
+            }} />
+
+            {/* 4. Secondary 'Stardust' Layer (Depth) */}
+            <div className="dust-container">
+                {Array(30).fill(0).map((_, i) => (
                     <motion.div
-                        key={i}
+                        key={`dust-${i}`}
+                        animate={{
+                            y: [Math.random() * 100, Math.random() * 100 - 50],
+                            opacity: [0, 0.4, 0]
+                        }}
+                        transition={{
+                            duration: 5 + Math.random() * 10,
+                            repeat: Infinity,
+                            ease: "linear",
+                            delay: Math.random() * 5
+                        }}
+                        style={{
+                            position: 'absolute',
+                            left: `${Math.random() * 100}%`,
+                            top: `${Math.random() * 100}%`,
+                            width: '2px',
+                            height: '2px',
+                            background: '#fff',
+                            borderRadius: '50%',
+                            boxShadow: `0 0 4px ${color}`
+                        }}
+                    />
+                ))}
+            </div>
+
+            {/* 5. Primary Dynamic Particles */}
+            <div className="particles-container">
+                {Array(25).fill(0).map((_, i) => (
+                    <motion.div
+                        key={`orb-${i}`}
                         className="genre-particle"
                         animate={getParticleVariants(i)}
                         style={{
                             position: 'absolute',
                             left: `${Math.random() * 100}%`,
                             top: `${Math.random() * 100}%`,
-                            width: 5 + Math.random() * 15,
-                            height: 5 + Math.random() * 15,
+                            width: 8 + Math.random() * 12, // Larger, softer orbs
+                            height: 8 + Math.random() * 12,
                             background: color,
                             borderRadius: '50%',
-                            filter: 'blur(2px)',
-                            opacity: 0.6
+                            filter: 'blur(4px)', // Increased blur for premium feel
+                            mixBlendMode: 'screen'
                         }}
                     />
                 ))}
             </div>
-            {/* Overlay for vibe integration */}
-            <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0, bottom: 0,
-                background: `linear-gradient(to bottom, transparent, ${color}10)`,
-                mixBlendMode: 'overlay'
-            }} />
         </motion.div>
     );
 };
+
+// Component for individual genre pill in the cloud
+const ShowcaseGenre = ({ genre, color, delay, onHover }) => (
+    <motion.div
+        className="showcase-genre"
+        initial={{ opacity: 0, scale: 0.5 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay, type: "spring" }}
+        whileHover={{ scale: 1.1, zIndex: 10 }}
+        onMouseEnter={() => {
+            onHover(true);
+            genrePreviewManager.playGenrePreview(genre);
+            audioEngine.duck();
+        }}
+        onMouseLeave={() => {
+            onHover(false);
+            genrePreviewManager.stopGenrePreview();
+            audioEngine.unduck();
+        }}
+        style={{
+            background: `${color}15`,
+            border: `1px solid ${color}30`,
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '30px',
+            cursor: 'pointer',
+            backdropFilter: 'blur(5px)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: `0 4px 15px ${color}10`,
+            position: 'relative'
+        }}
+    >
+        <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: color,
+            boxShadow: `0 0 8px ${color}`
+        }} />
+        <span style={{ fontWeight: 500, letterSpacing: '0.5px' }}>{genre}</span>
+    </motion.div>
+);
 
 // ============================================================================
 // MAIN LANDING PAGE COMPONENT
 // ============================================================================
 
 const LandingPage = ({ onLogin, isMobile }) => {
-    const [audioEnabled, setAudioEnabled] = useState(true); // Auto-enabled
+    const [audioEnabled, setAudioEnabled] = useState(true); // Keep track of engine status
+    const [volume, setVolume] = useState(0.3); // Global Volume
+    const [prevVolume, setPrevVolume] = useState(0.3); // For unmute
     const [swipeCount, setSwipeCount] = useState(0);
+
+    const handleVolumeChange = (e) => {
+        const newVol = parseFloat(e.target.value);
+        setVolume(newVol);
+        audioEngine.setVolume(newVol);
+        genrePreviewManager.setVolume(newVol);
+
+        if (newVol > 0 && !audioEnabled) {
+            setAudioEnabled(true);
+            if (!audioEngine.isEnabled) {
+                audioEngine.enable();
+                genrePreviewManager.enable();
+                audioEngine.crossfadeToSection(activeSection);
+            }
+        } else if (newVol === 0 && audioEnabled) {
+            // Optional: Disable engine on mute? No, keep running silent.
+        }
+    };
+
+    const handleMuteToggle = () => {
+        if (volume > 0) {
+            setPrevVolume(volume);
+            setVolume(0);
+            audioEngine.setVolume(0);
+            genrePreviewManager.setVolume(0);
+        } else {
+            const restore = prevVolume || 0.3;
+            setVolume(restore);
+            audioEngine.setVolume(restore);
+            genrePreviewManager.setVolume(restore);
+
+            if (restore > 0 && !audioEngine.isEnabled) { // Changed newVol to restore
+                audioEngine.enable();
+                genrePreviewManager.enable();
+                audioEngine.crossfadeToSection(activeSection);
+            }
+        }
+    };
+
+    // Preload All Audio
+    useEffect(() => {
+        audioEngine.setVolume(volume);
+        audioEngine.preloadAll();
+        genrePreviewManager.preloadAll();
+    }, []);
     const [scrollProgress, setScrollProgress] = useState(0);
     const [showBackToTop, setShowBackToTop] = useState(false);
     const [activeSection, setActiveSection] = useState(0);
@@ -1049,18 +1800,7 @@ const LandingPage = ({ onLogin, isMobile }) => {
         };
     }, []);
 
-    const handleAudioToggle = async () => {
-        const newState = !audioEnabled;
-        setAudioEnabled(newState);
-        if (newState) {
-            await audioEngine.enable();
-            await genrePreviewManager.enable();
-            audioEngine.crossfadeToSection(activeSection);
-        } else {
-            audioEngine.disable();
-            genrePreviewManager.disable();
-        }
-    };
+
 
     const handleDemoSwipe = (direction) => {
         setSwipeCount(prev => prev + 1);
@@ -1100,8 +1840,8 @@ const LandingPage = ({ onLogin, isMobile }) => {
 
             <div className={`landing-page ${!isUnlocked ? 'locked' : ''}`} ref={containerRef}>
                 {/* IMMERSIVE GENRE BACKGROUND */}
-                <AnimatePresence>
-                    {hoveredGenreData && <GenreBackground data={hoveredGenreData} />}
+                <AnimatePresence mode="wait">
+                    {hoveredGenreData && <GenreBackground data={hoveredGenreData} key={hoveredGenreData.name} />}
                 </AnimatePresence>
 
                 {/* Scroll Progress Bar */}
@@ -1167,18 +1907,56 @@ const LandingPage = ({ onLogin, isMobile }) => {
                 <div className="grain-overlay" />
 
                 {/* Audio Toggle Button */}
-                <motion.button
-                    className="audio-toggle"
-                    onClick={handleAudioToggle}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                {/* Audio Volume Control */}
+                <motion.div
+                    className="volume-control"
+                    initial={{ opacity: 0, width: 50 }}
+                    animate={{ opacity: 1, width: 'auto' }}
                     transition={{ delay: 2 }}
+                    whileHover={{ scale: 1.05 }}
+                    style={{
+                        position: 'fixed',
+                        bottom: '30px',
+                        left: '30px',
+                        zIndex: 1000,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        padding: '10px 15px',
+                        borderRadius: '30px',
+                        backdropFilter: 'blur(10px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        width: 'auto', // Allow flex content to define width
+                        minWidth: '160px' // Ensure slider fits
+                    }}
                 >
-                    {audioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                    <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
-                </motion.button>
+                    <div
+                        onClick={handleMuteToggle}
+                        style={{ cursor: 'pointer', display: 'flex', color: 'white' }}
+                        title={volume === 0 ? "Unmute" : "Mute"}
+                    >
+                        {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </div>
+
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={volume}
+                        onChange={handleVolumeChange}
+                        style={{
+                            width: '100px',
+                            height: '4px',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '2px',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            accentColor: 'var(--accent)'
+                        }}
+                    />
+                </motion.div>
 
                 {/* ===== HERO SECTION ===== */}
                 <section className="hero-section">
@@ -1256,6 +2034,8 @@ const LandingPage = ({ onLogin, isMobile }) => {
                             className="scroll-indicator"
                             animate={{ y: [0, 10, 0] }}
                             transition={{ repeat: Infinity, duration: 1.5 }}
+                            onClick={() => scrollToSection(1)}
+                            style={{ cursor: 'pointer' }}
                         >
                             <span>Explore</span>
                             <ChevronDown size={24} />
@@ -1302,7 +2082,7 @@ const LandingPage = ({ onLogin, isMobile }) => {
                             number="03"
                             icon={Headphones}
                             title="Build Your Vibe"
-                            description="Your choices train our AI to find even better matches for your taste."
+                            description="Your choices train our Algorithm to find even better matches for your taste."
                             delay={0.2}
                         />
                     </div>
@@ -1422,7 +2202,7 @@ const LandingPage = ({ onLogin, isMobile }) => {
                         <FeatureCard
                             icon={Zap}
                             title="Lightning Fast"
-                            description="AI-powered recommendations that learn your taste in real-time. No waiting, just vibing."
+                            description="Algorithm-powered recommendations that learn your taste in real-time. No waiting, just vibing."
                             color="var(--accent)"
                             delay={0}
                         />
@@ -1511,55 +2291,70 @@ const LandingPage = ({ onLogin, isMobile }) => {
                                 </p>
                                 <span className="ai-badge">
                                     <Cpu size={14} />
-                                    Experimental AI Build
+                                    Experimental Build
                                 </span>
+                                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '8px' }}>
+                                    Music: Josh Woodward, Broke For Free, Kai Engel
+                                </p>
                             </motion.div>
                         </div>
                     )}
                 </section>
 
                 {/* ===== MOBILE CTA SECTION ===== */}
-                {isMobile && (
-                    <section className="mobile-cta-section">
+                {/* ===== CTA / FOOTER SECTION ===== */}
+                <section className="mobile-cta-section" style={{ minHeight: '50vh', justifyContent: 'flex-start', paddingTop: '100px' }}>
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                    >
+                        {isMobile ? (
+                            <>
+                                <Smartphone size={48} color="var(--accent)" style={{ margin: '0 auto 20px' }} />
+                                <h3>Swipe on the go</h3>
+                                <p>Discover new music anywhere, anytime</p>
+                            </>
+                        ) : (
+                            <>
+                                <Headphones size={48} color="var(--accent)" style={{ margin: '0 auto 20px' }} />
+                                <h3>Ready to Dive In?</h3>
+                                <p>Start your discovery journey now</p>
+                            </>
+                        )}
+                        <motion.button
+                            className="cta-button"
+                            onClick={handleCTAClick}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <Play size={20} fill="black" />
+                            <span>Start Now</span>
+                        </motion.button>
+                    </motion.div>
+
+                    <div className="landing-footer-content" style={{ marginTop: 'auto', paddingBottom: '40px' }}>
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
                             viewport={{ once: true }}
                         >
-                            <Smartphone size={48} color="var(--accent)" />
-                            <h3>Swipe on the go</h3>
-                            <p>Discover new music anywhere, anytime</p>
-                            <motion.button
-                                className="cta-button"
-                                onClick={handleCTAClick}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                <Play size={20} fill="black" />
-                                <span>Start Now</span>
-                            </motion.button>
+                            <p>
+                                Created by{' '}
+                                <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
+                                    Seppe Dorissen
+                                </a>
+                            </p>
+                            <span className="ai-badge">
+                                <Cpu size={14} />
+                                Experimental Build
+                            </span>
+                            <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '16px' }}>
+                                Music: Josh Woodward, Broke For Free, Kai Engel
+                            </p>
                         </motion.div>
-
-                        <div className="landing-footer-content">
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                whileInView={{ opacity: 1 }}
-                                viewport={{ once: true }}
-                            >
-                                <p>
-                                    Created by{' '}
-                                    <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
-                                        Seppe Dorissen
-                                    </a>
-                                </p>
-                                <span className="ai-badge">
-                                    <Cpu size={14} />
-                                    Experimental AI Build
-                                </span>
-                            </motion.div>
-                        </div>
-                    </section>
-                )}
+                    </div>
+                </section>
 
                 {/* ===== FOOTER ===== */}
 

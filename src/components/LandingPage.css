@@ -799,24 +799,58 @@ html {
    GENRE SHOWCASE SECTION
    ============================================================================ */
 
+/* ============================================================================ */
+
+/* GENRE SHOWCASE SECTION */
 .genre-section {
     position: relative;
     z-index: 10;
-    /* Colorful Nebula Vibe */
+    /* Colorful Nebula Vibe - Transparent to show fixed background */
     background:
         radial-gradient(circle at 10% 20%, rgba(29, 185, 84, 0.08) 0%, transparent 40%),
         radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.05) 0%, transparent 50%),
-        linear-gradient(to bottom, #000 0%, #050505 50%, #000 100%);
+        radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.05) 0%, transparent 50%);
+}
+
+/* FEATURES SECTION */
+.features-section {
+    position: relative;
+    z-index: 10;
+    scroll-snap-align: start;
+    /* Clean Dark Glass Vibe - Transparent */
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* EXPERIENCE SECTION */
+.experience-section {
+    position: relative;
+    z-index: 10;
+    /* Warm Golden Glow Vibe - Transparent */
+    background: radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.15) 0%, transparent 60%);
+    justify-content: center;
+}
+
+/* DEMO SECTION */
+.demo-section {
+    position: relative;
+    z-index: 10;
+    /* Energetic Spotlight Vibe - Transparent */
+    background: radial-gradient(circle at center, rgba(139, 92, 246, 0.15) 0%, transparent 60%);
+    overflow: hidden;
 }
 
 .genre-cloud {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 15px;
-    max-width: 800px;
+    gap: 16px;
+    max-width: 1000px;
+    /* Increased from 800px to fix orphan layout */
     margin: 0 auto 50px;
+    padding: 0 20px;
+    /* Ensure padding on mobile */
 }
 
 .showcase-genre {
@@ -873,7 +907,7 @@ html {
     z-index: 10;
     scroll-snap-align: start;
     /* Clean Dark Glass Vibe */
-    background: linear-gradient(180deg, #000 0%, #0a0a0a 100%);
+    background: transparent;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -928,7 +962,7 @@ html {
     position: relative;
     z-index: 10;
     /* Warm Golden Glow Vibe */
-    background: radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.15) 0%, transparent 60%), #000;
+    background: radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.15) 0%, transparent 60%);
     justify-content: center;
     /* Center content vertically */
 }
