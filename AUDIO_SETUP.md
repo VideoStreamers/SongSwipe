@@ -8,30 +8,27 @@ We recommend **NoCopyrightSounds (NCS)** or similar royalty-free libraries for h
 ## Required Files
 Place your chosen `.mp3` files in `public/audio/sections/` with the following names:
 
+## Placeholder Tracks (Included)
+The project currently uses high-quality generated tracks from **SoundHelix** as placeholders. These are free to use for testing but should be replaced for a unique brand identity.
+
 1. **Top Section (Hero)**
-   - File: `hero-theme.mp3`
-   - Vibe: Cinematic, ethereal, grand opener.
+   - File: `hero-theme.mp3` (SoundHelix-Song-1)
    
 2. **How It Works**
-   - File: `how-it-works-beat.mp3`
-   - Vibe: Technical, rhythmic, explaining a process.
+   - File: `how-it-works-beat.mp3` (SoundHelix-Song-3)
 
 3. **Demo Section**
-   - File: `demo-vibe.mp3`
-   - Vibe: Energetic, fun, interactive loop.
+   - File: `demo-vibe.mp3` (SoundHelix-Song-8)
 
 4. **Genres Section (Ambient)**
-   - File: `genres-ambient.mp3`
-   - Vibe: Subtle background texture, diverse, not overpowering.
-   - *Note*: This track will automatically lower in volume ("duck") when a user hovers over a genre to preview it.
+   - File: `genres-ambient.mp3` (SoundHelix-Song-12)
+   - *Note*: This track will automatically lower in volume ("duck") when a user hovers over a genre preview.
 
 5. **Features Section**
-   - File: `features-loop.mp3`
-   - Vibe: Clean, modern, sophisticated background.
+   - File: `features-loop.mp3` (SoundHelix-Song-15)
 
 6. **Experience Section (Footer)**
-   - File: `experience-grand.mp3`
-   - Vibe: Warm, concluding, inspiring call-to-action.
+   - File: `experience-grand.mp3` (SoundHelix-Song-16)
 
 ## Genre Previews
 Place short 10-30s clips for each genre in `public/audio/genres/`:
