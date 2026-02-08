@@ -569,7 +569,7 @@ const FeatureCard = ({ icon: Icon, title, description, color, delay = 0 }) => (
 );
 
 // Showcase Card (for the music showcase section)
-const ShowcaseGenre = ({ genre, color, delay }) => (
+const ShowcaseGenre = ({ genre, color, delay, onHover }) => (
     <motion.div
         className="showcase-genre"
         style={{ '--genre-color': color }}
@@ -584,10 +584,12 @@ const ShowcaseGenre = ({ genre, color, delay }) => (
                 audioEngine.duck();
                 genrePreviewManager.playGenrePreview(genre);
             }
+            onHover?.(true);
         }}
         onHoverEnd={() => {
             genrePreviewManager.stopGenrePreview();
             audioEngine.unduck();
+            onHover?.(false);
         }}
     >
         {genre}
@@ -824,6 +826,134 @@ const WelcomeUnlock = ({ onUnlock }) => {
 };
 
 // ============================================================================
+// GENRE DATA & ASSETS
+// ============================================================================
+
+const GENRES_DATA = [
+    { name: 'Indie Pop', color: '#1DB954', vibe: 'floaty' },
+    { name: 'Electronic', color: '#00d2ff', vibe: 'electric' },
+    { name: 'Hip-Hop', color: '#FF4B2B', vibe: 'bouncy' },
+    { name: 'R&B', color: '#8b5cf6', vibe: 'wavy' },
+    { name: 'Alternative', color: '#f59e0b', vibe: 'chaos' },
+    { name: 'Jazz', color: '#ec4899', vibe: 'wavy' },
+    { name: 'Soul', color: '#10b981', vibe: 'floaty' },
+    { name: 'Lo-Fi', color: '#6366f1', vibe: 'calm' },
+    { name: 'Funk', color: '#f97316', vibe: 'bouncy' },
+    { name: 'Acoustic', color: '#84cc16', vibe: 'calm' },
+    { name: 'Synthwave', color: '#a855f7', vibe: 'electric' },
+    { name: 'Chill', color: '#22d3ee', vibe: 'calm' }
+];
+
+// Immersive Background Effect Component
+const GenreBackground = ({ data }) => {
+    if (!data) return null;
+
+    const { color, vibe } = data;
+
+    // Particle variants based on vibe
+    const getParticleVariants = (i) => {
+        const base = {
+            opacity: [0.3, 0.8, 0.3],
+            scale: [1, 1.5, 1],
+        };
+
+        switch (vibe) {
+            case 'calm': // Slow, gentle drift
+                return {
+                    ...base,
+                    y: [0, -30, 0],
+                    x: [0, 20, 0],
+                    transition: { duration: 8 + Math.random() * 5, repeat: Infinity, ease: "easeInOut" }
+                };
+            case 'wavy': // Sine wave motion
+                return {
+                    ...base,
+                    y: [0, -50, 0],
+                    x: [0, 50, -50, 0],
+                    transition: { duration: 6 + Math.random() * 4, repeat: Infinity, ease: "easeInOut" }
+                };
+            case 'floaty': // Upward floating bubbles
+                return {
+                    opacity: [0, 1, 0],
+                    y: [100, -100],
+                    scale: [0.5, 1.5],
+                    transition: { duration: 5 + Math.random() * 5, repeat: Infinity, ease: "easeOut" }
+                };
+            case 'bouncy': // Energetic pulses
+                return {
+                    scale: [1, 2, 1],
+                    opacity: [0.5, 1, 0.5],
+                    transition: { duration: 0.5 + Math.random() * 0.5, repeat: Infinity, ease: "easeInOut" }
+                };
+            case 'electric': // Fast, erratic glitch
+                return {
+                    opacity: [1, 0, 1, 0.5, 1],
+                    x: [0, 10, -10, 0],
+                    y: [0, -10, 10, 0],
+                    transition: { duration: 0.2 + Math.random() * 0.3, repeat: Infinity }
+                };
+            case 'chaos': // Random rapid movement
+                return {
+                    x: [0, Math.random() * 100 - 50],
+                    y: [0, Math.random() * 100 - 50],
+                    opacity: [1, 0.5, 1],
+                    transition: { duration: 2, repeat: Infinity, type: "spring", stiffness: 100 }
+                };
+            default:
+                return base;
+        }
+    };
+
+    return (
+        <motion.div
+            className="genre-immersive-bg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: `radial-gradient(circle at center, ${color}30 0%, transparent 80%)`,
+                pointerEvents: 'none',
+                zIndex: 1 // Behind content but above base bg
+            }}
+        >
+            <div className="genre-particles" style={{ overflow: 'hidden', width: '100%', height: '100%', position: 'absolute' }}>
+                {[...Array(30)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="genre-particle"
+                        animate={getParticleVariants(i)}
+                        style={{
+                            position: 'absolute',
+                            left: `${Math.random() * 100}%`,
+                            top: `${Math.random() * 100}%`,
+                            width: 5 + Math.random() * 15,
+                            height: 5 + Math.random() * 15,
+                            background: color,
+                            borderRadius: '50%',
+                            filter: 'blur(2px)',
+                            opacity: 0.6
+                        }}
+                    />
+                ))}
+            </div>
+            {/* Overlay for vibe integration */}
+            <div style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: `linear-gradient(to bottom, transparent, ${color}10)`,
+                mixBlendMode: 'overlay'
+            }} />
+        </motion.div>
+    );
+};
+
+// ============================================================================
 // MAIN LANDING PAGE COMPONENT
 // ============================================================================
 
@@ -835,6 +965,7 @@ const LandingPage = ({ onLogin, isMobile }) => {
     const [activeSection, setActiveSection] = useState(0);
     const [hasInteracted, setHasInteracted] = useState(false);
     const [isUnlocked, setIsUnlocked] = useState(false); // New: Track if user has unlocked
+    const [hoveredGenreData, setHoveredGenreData] = useState(null); // New: Track hovered genre for bg effect
     const containerRef = useRef(null);
     const lastSectionRef = useRef(0);
 
@@ -968,6 +1099,11 @@ const LandingPage = ({ onLogin, isMobile }) => {
             </AnimatePresence>
 
             <div className={`landing-page ${!isUnlocked ? 'locked' : ''}`} ref={containerRef}>
+                {/* IMMERSIVE GENRE BACKGROUND */}
+                <AnimatePresence>
+                    {hoveredGenreData && <GenreBackground data={hoveredGenreData} />}
+                </AnimatePresence>
+
                 {/* Scroll Progress Bar */}
                 <motion.div
                     className="scroll-progress-bar"
@@ -1247,18 +1383,15 @@ const LandingPage = ({ onLogin, isMobile }) => {
                     </div>
 
                     <div className="genre-cloud">
-                        <ShowcaseGenre genre="Indie Pop" color="#1DB954" delay={0} />
-                        <ShowcaseGenre genre="Electronic" color="#00d2ff" delay={0.05} />
-                        <ShowcaseGenre genre="Hip-Hop" color="#FF4B2B" delay={0.1} />
-                        <ShowcaseGenre genre="R&B" color="#8b5cf6" delay={0.15} />
-                        <ShowcaseGenre genre="Alternative" color="#f59e0b" delay={0.2} />
-                        <ShowcaseGenre genre="Jazz" color="#ec4899" delay={0.25} />
-                        <ShowcaseGenre genre="Soul" color="#10b981" delay={0.3} />
-                        <ShowcaseGenre genre="Lo-Fi" color="#6366f1" delay={0.35} />
-                        <ShowcaseGenre genre="Funk" color="#f97316" delay={0.4} />
-                        <ShowcaseGenre genre="Acoustic" color="#84cc16" delay={0.45} />
-                        <ShowcaseGenre genre="Synthwave" color="#a855f7" delay={0.5} />
-                        <ShowcaseGenre genre="Chill" color="#22d3ee" delay={0.55} />
+                        {GENRES_DATA.map((g, i) => (
+                            <ShowcaseGenre
+                                key={g.name}
+                                genre={g.name}
+                                color={g.color}
+                                delay={i * 0.05}
+                                onHover={(isHovering) => setHoveredGenreData(isHovering ? g : null)}
+                            />
+                        ))}
                     </div>
 
                     <motion.div
