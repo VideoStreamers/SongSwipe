@@ -1350,58 +1350,63 @@ const GenreBackground = ({ data }) => {
                     </div>
                 );
             case 'R&B':
-                // Neon City Stream
+                // Neon City Stream (Randomized)
                 return (
                     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', background: '#050010' }}>
                         {/* Deep Pulsing Background */}
                         <motion.div
                             style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at center, ${color}30 0%, transparent 80%)` }}
-                            animate={{ opacity: [0.4, 0.7, 0.4], scale: [1, 1.1, 1] }}
+                            animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
                             transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                         />
-                        {/* Horizontal Light Streaks */}
-                        {[...Array(8)].map((_, i) => (
+                        {/* Randomized Light Streaks */}
+                        {[...Array(12)].map((_, i) => (
                             <motion.div
                                 key={`streak-${i}`}
                                 style={{
                                     position: 'absolute',
-                                    height: 2 + Math.random() * 4,
-                                    width: '40%',
-                                    background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                                    height: Math.random() > 0.7 ? 4 + Math.random() * 6 : 1 + Math.random() * 2, // Mix of thick and thin
+                                    width: `${20 + Math.random() * 40}%`,
+                                    background: `linear-gradient(90deg, transparent, ${i % 3 === 0 ? '#fff' : color}, transparent)`,
                                     top: `${Math.random() * 100}%`,
                                     left: '-50%',
-                                    filter: 'blur(4px)',
-                                    opacity: 0.8
+                                    filter: `blur(${Math.random() * 6}px)`,
+                                    opacity: 0.5 + Math.random() * 0.5
                                 }}
-                                animate={{ left: ['-50%', '150%'] }}
+                                animate={{
+                                    left: ['-50%', '150%'],
+                                    width: [`${20 + Math.random() * 40}%`, `${30 + Math.random() * 50}%`] // Grow slightly
+                                }}
                                 transition={{
-                                    duration: 2 + Math.random() * 3,
+                                    duration: 1 + Math.random() * 4, // Highly variable speed
                                     repeat: Infinity,
-                                    delay: Math.random() * 2,
-                                    ease: 'linear'
+                                    delay: Math.random() * 5,
+                                    ease: 'easeInOut' // Smooth accel/decel
                                 }}
                             />
                         ))}
-                        {/* City Light Orbs */}
-                        {[...Array(15)].map((_, i) => (
+                        {/* Floating City Embers */}
+                        {[...Array(20)].map((_, i) => (
                             <motion.div
                                 key={`city-orb-${i}`}
                                 style={{
                                     position: 'absolute',
-                                    width: 10 + Math.random() * 30,
-                                    height: 10 + Math.random() * 30,
-                                    background: i % 2 === 0 ? color : '#fff',
+                                    width: 4 + Math.random() * 60, // Huge variance in size
+                                    height: 4 + Math.random() * 60,
+                                    background: Math.random() > 0.8 ? '#fff' : color,
                                     borderRadius: '50%',
-                                    filter: 'blur(20px)',
+                                    filter: `blur(${2 + Math.random() * 20}px)`,
                                     top: `${Math.random() * 100}%`,
-                                    left: `${Math.random() * 100}%`
+                                    left: `${Math.random() * 100}%`,
+                                    opacity: Math.random() * 0.5
                                 }}
                                 animate={{
-                                    x: [0, -100],
-                                    opacity: [0, 0.5, 0]
+                                    x: [0, (Math.random() - 0.5) * 50],
+                                    y: [0, -20 - Math.random() * 50], // Drift up
+                                    opacity: [0, 0.6, 0]
                                 }}
                                 transition={{
-                                    duration: 5 + Math.random() * 5,
+                                    duration: 4 + Math.random() * 6,
                                     repeat: Infinity,
                                     delay: Math.random() * 5,
                                     ease: 'linear'
@@ -1482,56 +1487,86 @@ const GenreBackground = ({ data }) => {
                     </div>
                 );
             case 'Lo-Fi':
-                // Dreamy Cloudscape
+                // VHS Glitch & Static Melancholy
                 return (
-                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, #2e2e3e 0%, ${color}15 100%)` }} />
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', background: '#101015' }}>
 
-                        {/* Gentle Moon */}
-                        <div style={{
-                            position: 'absolute', top: '15%', right: '20%', width: 120, height: 120,
-                            borderRadius: '50%', background: '#fff',
-                            boxShadow: `0 0 60px ${color}60`
-                        }} />
+
+
 
                         {/* Drifting Clouds */}
+                        <CRTOverlay />
+
+                        {/* Color Shift Background */}
+                        <motion.div
+                            style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 50% 50%, ${color}20 0%, transparent 80%)` }}
+                            animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.05, 1] }}
+                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                        />
+
+                        {/* Random Glitch Strips */}
                         {[...Array(6)].map((_, i) => (
                             <motion.div
-                                key={`cloud-${i}`}
+                                key={`glitch-${i}`}
                                 style={{
                                     position: 'absolute',
-                                    width: 200 + Math.random() * 200,
-                                    height: 100 + Math.random() * 80,
-                                    background: `${color}15`,
-                                    borderRadius: '50%',
-                                    filter: 'blur(40px)',
-                                    top: `${20 + Math.random() * 60}%`,
-                                    left: '-20%'
+                                    height: `${Math.random() * 100}px`,
+                                    width: '100%',
+                                    background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)`,
+                                    top: `${Math.random() * 100}%`,
+                                    left: 0,
+                                    mixBlendMode: 'overlay'
                                 }}
-                                animate={{ x: ['-20vw', '120vw'] }}
+                                animate={{
+                                    opacity: [0, 1, 0, 1, 0],
+                                    x: [-10, 10, -5, 5, 0]
+                                }}
                                 transition={{
-                                    duration: 30 + Math.random() * 20,
+                                    duration: 0.2 + Math.random() * 0.5,
                                     repeat: Infinity,
-                                    delay: Math.random() * 20,
-                                    ease: 'linear'
+                                    repeatDelay: Math.random() * 3,
+                                    ease: "steps(5)"
                                 }}
                             />
                         ))}
 
-                        {/* Floating Stars */}
-                        {[...Array(30)].map((_, i) => (
+                        {/* Scrolling Scanlines (Tracking Error) */}
+                        <motion.div
+                            style={{
+                                position: 'absolute', width: '100%', height: '100%',
+                                background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px)',
+                                opacity: 0.3
+                            }}
+                            animate={{ backgroundPosition: ['0% 0%', '0% 100%'] }}
+                            transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                        />
+
+                        {/* Digital Artifacts / Blocks */}
+                        {[...Array(8)].map((_, i) => (
                             <motion.div
-                                key={`star-${i}`}
+                                key={`artifact-${i}`}
                                 style={{
-                                    position: 'absolute', width: 2, height: 2, background: '#fff',
-                                    borderRadius: '50%',
+                                    position: 'absolute',
+                                    width: 20 + Math.random() * 100,
+                                    height: 5 + Math.random() * 20,
+                                    background: color,
+                                    top: `${Math.random() * 100}%`,
                                     left: `${Math.random() * 100}%`,
-                                    top: `${Math.random() * 100}%`
+                                    opacity: 0.4
                                 }}
-                                animate={{ opacity: [0.2, 0.8, 0.2] }}
-                                transition={{ duration: 2 + Math.random() * 3, repeat: Infinity, delay: Math.random() * 5 }}
+                                animate={{
+                                    opacity: [0, 0.6, 0],
+                                    scaleX: [1, 1.5, 1]
+                                }}
+                                transition={{
+                                    duration: 0.1,
+                                    repeat: Infinity,
+                                    repeatDelay: Math.random() * 4
+                                }}
                             />
                         ))}
+
+
                     </div>
                 );
             case 'Alternative':
