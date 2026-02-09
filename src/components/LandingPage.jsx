@@ -1488,7 +1488,7 @@ const GenreBackground = ({ data }) => {
                                         opacity: [0.5, 0.8, 1, 0.7, 0.5]
                                     }}
                                     transition={{
-                                        duration: 1.5 + Math.random() * 2, // Slower
+                                        duration: 3 + Math.random() * 4, // Even Slower
                                         repeat: Infinity,
                                         ease: "easeInOut",
                                         delay: Math.random() * 2,
