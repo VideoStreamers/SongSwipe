@@ -1478,14 +1478,21 @@ const GenreBackground = ({ data }) => {
                                         boxShadow: `0 0 10px ${color}80`
                                     }}
                                     animate={{
-                                        height: ['10%', `${20 + Math.random() * 60}%`, '10%'],
-                                        opacity: [0.5, 1, 0.5]
+                                        height: [
+                                            '10%',
+                                            `${20 + Math.random() * 60}%`,
+                                            `${10 + Math.random() * 40}%`,
+                                            `${30 + Math.random() * 60}%`,
+                                            '10%'
+                                        ],
+                                        opacity: [0.5, 0.8, 1, 0.7, 0.5]
                                     }}
                                     transition={{
-                                        duration: 0.4 + Math.random() * 0.5,
+                                        duration: 1.5 + Math.random() * 2, // Slower
                                         repeat: Infinity,
                                         ease: "easeInOut",
-                                        delay: i * 0.05
+                                        delay: Math.random() * 2,
+                                        repeatType: "reverse"
                                     }}
                                 />
                             ))}
