@@ -27,6 +27,7 @@ class SectionAudioEngine {
         this.volume = 0.3;
         this.isDucked = false;
         this.activeFades = new Map();
+        this.playingAudios = new Set(); // Track all playing instances
     }
 
     preloadAll() {
@@ -51,12 +52,14 @@ class SectionAudioEngine {
 
     disable() {
         this.isEnabled = false;
-        if (this.currentAudio) {
-            this.fadeOut(this.currentAudio, () => {
-                this.currentAudio?.pause();
-                this.currentAudio = null;
+        // Stop all sounds
+        this.playingAudios.forEach(audio => {
+            this.fadeOut(audio, () => {
+                audio.pause();
+                this.playingAudios.delete(audio);
             });
-        }
+        });
+        this.currentAudio = null;
     }
 
     cancelFade(audio) {
@@ -127,57 +130,58 @@ class SectionAudioEngine {
             return;
         }
 
-        if (sectionIndex === this.currentSection) return;
+        if (sectionIndex === this.currentSection && this.currentAudio) return;
         this.currentSection = sectionIndex;
 
         const audioPath = SECTION_AUDIO[sectionIndex];
 
-        // Handle "No Audio" section (if any)
-        if (!audioPath) {
-            if (this.currentAudio) {
-                this.fadeOut(this.currentAudio, () => {
-                    this.currentAudio?.pause();
-                    this.currentAudio = null;
+        // 1. Identify valid next audio (or null)
+        let newAudio = null;
+        if (audioPath) {
+            newAudio = this.cache[sectionIndex];
+            if (!newAudio) {
+                newAudio = new Audio(audioPath);
+                newAudio.loop = true;
+                newAudio.volume = 0;
+                this.cache[sectionIndex] = newAudio;
+            }
+        }
+
+        // 2. Stop ALL other audios immediately (except the new one if it was already playing)
+        this.playingAudios.forEach(audio => {
+            if (audio !== newAudio) {
+                // Cancel any pending fades on it
+                this.cancelFade(audio);
+                // Fast fade out or immediate stop? 
+                // Immediate stop is safer for "rapid scrolling" to avoid chaos
+                // But a very fast fade (0.3s) is nicer. 
+                // Let's do a fast fade out to avoid clicks, but force it.
+                this.fadeOut(audio, () => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    this.playingAudios.delete(audio);
                 });
             }
-            return;
-        }
+        });
 
-        // Use cache
-        let newAudio = this.cache[sectionIndex];
-        if (!newAudio) {
-            newAudio = new Audio(audioPath);
-            newAudio.loop = true;
-            newAudio.volume = 0;
-            this.cache[sectionIndex] = newAudio;
-        }
+        // 3. Play new Audio
+        if (newAudio) {
+            this.currentAudio = newAudio;
+            this.playingAudios.add(newAudio);
 
-        // Identical track? (Shouldn't happen if indices differ, but safe check)
-        if (this.currentAudio === newAudio) return;
-
-        // Fade out old
-        if (this.currentAudio) {
-            const oldAudio = this.currentAudio;
-            this.fadeOut(oldAudio, () => {
-                oldAudio.pause();
-            });
-        }
-
-        this.currentAudio = newAudio;
-
-        if (newAudio.paused) {
-            newAudio.currentTime = 0;
-            const playPromise = newAudio.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    this.fadeTo(newAudio, this.isDucked ? 0 : this.volume);
-                }).catch(e => {
-                    console.log('Section music play failed:', e);
-                });
+            if (newAudio.paused) {
+                const playPromise = newAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        this.fadeTo(newAudio, this.isDucked ? 0 : this.volume);
+                    }).catch(e => console.log('Audio play failed', e));
+                }
+            } else {
+                // Was already playing (maybe from previous rapid scroll)
+                this.fadeTo(newAudio, this.isDucked ? 0 : this.volume);
             }
         } else {
-            // If already playing, just ensure volume is correct
-            this.fadeTo(newAudio, this.isDucked ? 0 : this.volume);
+            this.currentAudio = null;
         }
     }
 
