@@ -1438,29 +1438,76 @@ const GenreBackground = ({ data }) => {
                     </div>
                 );
             case 'Jazz':
+                // Smoky Noir Club & Golden Rhythms
                 return (
-                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.4 }}>
-                        {[...Array(5)].map((_, i) => (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', background: '#080502' }}>
+                        {/* Smoky Spotlight Atmosphere */}
+                        {[...Array(2)].map((_, i) => (
                             <motion.div
-                                key={`jazz-line-${i}`}
+                                key={`spotlight-${i}`}
                                 style={{
-                                    position: 'absolute', width: '120%', height: '1px', background: color,
-                                    left: '-10%', top: `${45 + i * 3}%`, boxShadow: `0 0 5px ${color}`
+                                    position: 'absolute',
+                                    width: '80%', height: '80%',
+                                    background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`,
+                                    left: i === 0 ? '-20%' : '40%',
+                                    top: i === 0 ? '-20%' : '40%',
+                                    filter: 'blur(60px)',
                                 }}
-                                animate={{ y: [0, 20, -20, 0], opacity: [0.2, 0.8, 0.2] }}
-                                transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
+                                animate={{
+                                    x: [0, 30, -30, 0],
+                                    y: [0, -30, 30, 0],
+                                    scale: [1, 1.1, 1]
+                                }}
+                                transition={{ duration: 15 + i * 5, repeat: Infinity, ease: 'easeInOut' }}
                             />
                         ))}
-                        {[...Array(8)].map((_, i) => (
-                            <motion.div
-                                key={`jazz-note-${i}`}
-                                style={{ position: 'absolute', left: `${10 + (i * 12)}%`, bottom: '-10%' }}
-                                animate={{ y: ['0vh', '-120vh'], x: [0, Math.sin(i) * 100, 0], rotate: [0, 45, -45, 0], opacity: [0, 1, 0] }}
-                                transition={{ duration: 8 + Math.random() * 5, repeat: Infinity, ease: 'linear', delay: i * 0.8 }}
-                            >
-                                <Music size={40 + i * 5} color={color} style={{ filter: `drop-shadow(0 0 15px ${color})` }} />
-                            </motion.div>
-                        ))}
+
+                        {/* Syncopated Rhythm Particles (Improvisational Movement) */}
+                        {[...Array(12)].map((_, i) => {
+                            const size = 5 + Math.random() * 20;
+                            return (
+                                <motion.div
+                                    key={`jazz-particle-${i}`}
+                                    style={{
+                                        position: 'absolute',
+                                        width: size, height: size,
+                                        background: color,
+                                        borderRadius: '50%',
+                                        opacity: 0.2 + Math.random() * 0.4,
+                                        boxShadow: `0 0 ${10 + Math.random() * 20}px ${color}`
+                                    }}
+                                    initial={{
+                                        left: `${Math.random() * 100}%`,
+                                        top: `${Math.random() * 100}%`
+                                    }}
+                                    animate={{
+                                        x: [(Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100],
+                                        y: [(Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100],
+                                        opacity: [0, 0.6, 0],
+                                        scale: [0.5, 1.5, 0.5]
+                                    }}
+                                    transition={{
+                                        duration: 5 + Math.random() * 5,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        times: [0, 0.5, 1]
+                                    }}
+                                />
+                            );
+                        })}
+
+                        {/* Occasional Brass Shine */}
+                        <motion.div
+                            style={{
+                                position: 'absolute',
+                                width: '200%', height: '100%',
+                                background: `linear-gradient(90deg, transparent, ${color}15, transparent)`,
+                                transform: 'skewX(-20deg)',
+                                left: '-200%'
+                            }}
+                            animate={{ left: ['-100%', '200%'] }}
+                            transition={{ duration: 6, repeat: Infinity, repeatDelay: 5 + Math.random() * 10, ease: 'easeInOut' }}
+                        />
                     </div>
                 );
             case 'Chill':
