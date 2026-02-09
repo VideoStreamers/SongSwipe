@@ -1438,76 +1438,85 @@ const GenreBackground = ({ data }) => {
                     </div>
                 );
             case 'Jazz':
-                // Smoky Noir Club & Golden Rhythms
+                // Energetic Brass Equalizer & Champagne
                 return (
-                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', background: '#080502' }}>
-                        {/* Smoky Spotlight Atmosphere */}
-                        {[...Array(2)].map((_, i) => (
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', background: '#1a1005' }}>
+
+                        {/* Rotating Brass Discs */}
+                        {[...Array(3)].map((_, i) => (
                             <motion.div
-                                key={`spotlight-${i}`}
+                                key={`disc-${i}`}
                                 style={{
                                     position: 'absolute',
-                                    width: '80%', height: '80%',
-                                    background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`,
-                                    left: i === 0 ? '-20%' : '40%',
-                                    top: i === 0 ? '-20%' : '40%',
-                                    filter: 'blur(60px)',
+                                    left: '50%', top: '50%',
+                                    width: `${40 + i * 25}%`,
+                                    height: `${40 + i * 25}%`,
+                                    border: `1px solid ${color}40`,
+                                    borderRadius: '50%',
+                                    x: '-50%', y: '-50%',
                                 }}
-                                animate={{
-                                    x: [0, 30, -30, 0],
-                                    y: [0, -30, 30, 0],
-                                    scale: [1, 1.1, 1]
+                                animate={{ rotate: [0, 360], scale: [1, 1.05, 1] }}
+                                transition={{
+                                    rotate: { duration: 20 + i * 10, repeat: Infinity, ease: "linear" },
+                                    scale: { duration: 2 + i, repeat: Infinity, ease: "easeInOut" }
                                 }}
-                                transition={{ duration: 15 + i * 5, repeat: Infinity, ease: 'easeInOut' }}
                             />
                         ))}
 
-                        {/* Syncopated Rhythm Particles (Improvisational Movement) */}
-                        {[...Array(12)].map((_, i) => {
-                            const size = 5 + Math.random() * 20;
-                            return (
+                        {/* Kinetic Equalizer Bars (The 'Cool' Factor) */}
+                        <div style={{
+                            position: 'absolute', inset: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2%'
+                        }}>
+                            {[...Array(15)].map((_, i) => (
                                 <motion.div
-                                    key={`jazz-particle-${i}`}
+                                    key={`eq-${i}`}
                                     style={{
-                                        position: 'absolute',
-                                        width: size, height: size,
+                                        width: '10px',
                                         background: color,
-                                        borderRadius: '50%',
-                                        opacity: 0.2 + Math.random() * 0.4,
-                                        boxShadow: `0 0 ${10 + Math.random() * 20}px ${color}`
-                                    }}
-                                    initial={{
-                                        left: `${Math.random() * 100}%`,
-                                        top: `${Math.random() * 100}%`
+                                        borderRadius: '10px',
+                                        boxShadow: `0 0 10px ${color}80`
                                     }}
                                     animate={{
-                                        x: [(Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100],
-                                        y: [(Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100],
-                                        opacity: [0, 0.6, 0],
-                                        scale: [0.5, 1.5, 0.5]
+                                        height: ['10%', `${20 + Math.random() * 60}%`, '10%'],
+                                        opacity: [0.5, 1, 0.5]
                                     }}
                                     transition={{
-                                        duration: 5 + Math.random() * 5,
+                                        duration: 0.4 + Math.random() * 0.5,
                                         repeat: Infinity,
                                         ease: "easeInOut",
-                                        times: [0, 0.5, 1]
+                                        delay: i * 0.05
                                     }}
                                 />
-                            );
-                        })}
+                            ))}
+                        </div>
 
-                        {/* Occasional Brass Shine */}
-                        <motion.div
-                            style={{
-                                position: 'absolute',
-                                width: '200%', height: '100%',
-                                background: `linear-gradient(90deg, transparent, ${color}15, transparent)`,
-                                transform: 'skewX(-20deg)',
-                                left: '-200%'
-                            }}
-                            animate={{ left: ['-100%', '200%'] }}
-                            transition={{ duration: 6, repeat: Infinity, repeatDelay: 5 + Math.random() * 10, ease: 'easeInOut' }}
-                        />
+                        {/* Rising Champagne Sparkles */}
+                        {[...Array(30)].map((_, i) => (
+                            <motion.div
+                                key={`sparkle-${i}`}
+                                style={{
+                                    position: 'absolute',
+                                    width: 2 + Math.random() * 4,
+                                    height: 2 + Math.random() * 4,
+                                    background: '#fff',
+                                    borderRadius: '50%',
+                                    left: `${Math.random() * 100}%`,
+                                    bottom: '-10%'
+                                }}
+                                animate={{
+                                    bottom: '120%',
+                                    opacity: [0, 1, 0],
+                                    x: [0, (Math.random() - 0.5) * 50]
+                                }}
+                                transition={{
+                                    duration: 2 + Math.random() * 3,
+                                    repeat: Infinity,
+                                    ease: "linear",
+                                    delay: Math.random() * 5
+                                }}
+                            />
+                        ))}
                     </div>
                 );
             case 'Chill':
