@@ -2456,58 +2456,7 @@ const LandingPage = ({ onLogin, isMobile }) => {
 
                 {/* ===== MOBILE CTA SECTION ===== */}
                 {/* ===== CTA / FOOTER SECTION ===== */}
-                <section className="mobile-cta-section" style={{ minHeight: '50vh', justifyContent: 'flex-start', paddingTop: '100px' }}>
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                    >
-                        {isMobile ? (
-                            <>
-                                <Smartphone size={48} color="var(--accent)" style={{ margin: '0 auto 20px' }} />
-                                <h3>Swipe on the go</h3>
-                                <p>Discover new music anywhere, anytime</p>
-                            </>
-                        ) : (
-                            <>
-                                <Headphones size={48} color="var(--accent)" style={{ margin: '0 auto 20px' }} />
-                                <h3>Ready to Dive In?</h3>
-                                <p>Start your discovery journey now</p>
-                            </>
-                        )}
-                        <motion.button
-                            className="cta-button"
-                            onClick={handleCTAClick}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                        >
-                            <Play size={20} fill="black" />
-                            <span>Start Now</span>
-                        </motion.button>
-                    </motion.div>
 
-                    <div className="landing-footer-content" style={{ marginTop: 'auto', paddingBottom: '40px' }}>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            whileInView={{ opacity: 1 }}
-                            viewport={{ once: true }}
-                        >
-                            <p>
-                                Created by{' '}
-                                <a href="https://seppedorissen.be" target="_blank" rel="noopener noreferrer">
-                                    Seppe Dorissen
-                                </a>
-                            </p>
-                            <span className="ai-badge">
-                                <Cpu size={14} />
-                                Experimental Build
-                            </span>
-                            <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '16px' }}>
-                                Music: Josh Woodward, Broke For Free, Kai Engel
-                            </p>
-                        </motion.div>
-                    </div>
-                </section>
 
                 {/* ===== FOOTER ===== */}
 
